@@ -1,4 +1,3 @@
-# manuscrito 2
 ### Análisis de las secuencias de ITS obtenidas con un max=8
 
 ### change directory

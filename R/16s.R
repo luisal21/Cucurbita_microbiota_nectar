@@ -1,29 +1,29 @@
-### Análisis de las secuencias de ITS obtenidas con un max=8
+### Análisis de las secuencias de 16s
 
-### change directory
-setwd("/home/luis/16s_2024")
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq); packageVersion("phyloseq")
 library(ggplot2)
-library(VennDiagram)
+library(VennDiagram) # no instalado
 library(picante)
 library(ape)
 library("microbiome")
 library("dplyr")
-library("hrbrthemes")
-library("gcookbook")
+library("hrbrthemes") # no instalado
+library("gcookbook") # no instalado
 #library("tidyverse")
 library("RColorBrewer")
 library("ggpubr")
-library("breakaway")
+library("breakaway") # no instalado
 
+### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
+# deshabilitar este codigo
 ### Transponer tabla de ASV
-#asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
-#head(asvtable)
-#asv2 = t(asvtable)
-#head(asv2, 1)
-#write.csv(asv2, file = "asv_table.csv")
+asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
+head(asvtable)
+asv2 = t(asvtable)
+head(asv2, 1)
+write.csv(asv2, file = "asv_table.csv")
 
 # cargar primero el archivo de metadatos
 meta_16s <- read.csv("meta_16s_2024.csv", header = T)

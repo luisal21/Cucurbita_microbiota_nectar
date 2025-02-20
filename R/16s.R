@@ -16,6 +16,10 @@ library("RColorBrewer")
 library("ggpubr")
 library("breakaway") # no instalado
 
+
+#### Set up directory in which the databases are located ####
+setwd("/home/luis/Documents/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
+
 ### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
 # deshabilitar este codigo
 ### Transponer tabla de ASV
@@ -81,7 +85,7 @@ plot_bar(s16_2, fill = "Phylum") +
   geom_bar(aes(color = Phylum), stat = "identity",
            position = "stack")
 
-##### Extraemos todas aquellas secuencias del reino Fungi #####
+##### Extraemos todas aquellas secuencias de bacterias #####
 s16_3 = subset_taxa(s16_2, Kingdom == "Bacteria")
 s16_3
 s16_3 = subset_taxa(s16_3, Order != "Chloroplast")

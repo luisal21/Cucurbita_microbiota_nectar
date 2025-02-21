@@ -1,10 +1,9 @@
 ### Análisis de las secuencias de 16s
 
-devtools::install_github("microsud/microbiomeutilities")
 
 
 # Cargando paquete phyloseq y paquetes adicionales
-library(phyloseq); packageVersion("phyloseq")
+library(phyloseq)
 library(ggplot2)
 #library(VennDiagram) # no instalado
 library(picante)
@@ -24,11 +23,11 @@ library(vegan)
 library(gridExtra)
 library(tidyr)
 library(reshape2)
-library(UpSetR)
-library(minpack.lm)
+library(UpSetR) # no instalado
+library(minpack.lm) # no instalado
 library(Hmisc)
 library(stats4)
-library(patchwork)
+library(patchwork) # no instalado
 
 
 #### Set up directory in which the databases are located ####
@@ -72,72 +71,79 @@ s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   sample_data(meta_16s))
 s16_1
 
-# obteniendo el arbol filogenetico
+# Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)
 # Uniendo el arbol con el objeto phyloseq anterior
 s16_2 = merge_phyloseq(s16_1, arbol_16s)
 s16_2
-# Si solo filtro morelia
+
+# Filtering samples of Morelia site
 s16_3 = subset_samples(s16_2, sitio=="morelia")
-s16_3
-
-# Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_3) # reads totales 9,725,000
-
-# información del número de reads
-summary(sample_sums(s16_3))
-
-##### Extraemos todas aquellas secuencias de bacterias #####
+# Removing Chloroplast and Mitochondria sequences and na samples in condition
 s16_4 = subset_samples(s16_3, condicion!="na")
-s16_4
 s16_4 = subset_taxa(s16_4, Order != "Chloroplast")
-s16_4
 s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
-s16_4
-
 # Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
 # pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
 # muestras que quedaron con 0 secuencias:
 s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
-s16_5
-#Final ASV data set: 3126 ASVs
+s16_5 # Final ASV data set: 3126 ASVs
+
+# Primero resumimos el contenido del objeto phyloseq
+summarize_phyloseq(s16_5) # reads totales 155,244
+
+# información del número de reads
 summary(sample_sums(s16_5))
-summarize_phyloseq(s16_5)
+range(sample_sums(s16_5))
+#Library size spans 2 - 24079 reads 
 
 # Obteniendo el número de read por muestra
 reads_sample = readcount(s16_5)
 reads_sample[1:5]
 write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
-range(sample_sums(s16_5))
-#Library size spans 2 - 24079 reads 
 
-# abundancia total a nivel de Phylum
-plot_bar(s16_5, fill = "Phylum")+ 
+
+rank_names(s16_5)
+table(tax_table(s16_5)[, "Phylum"], exclude = NULL)
+
+# A useful next step is to explore feature prevalence in the dataset,
+# which we will define here as the number of samples in which a taxa appears
+# at least once.
+
+# Compute prevalence of each feature, store as data.frame
+prevdf = apply(X = otu_table(s16_5),
+               MARGIN = ifelse(taxa_are_rows(s16_5), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+# Add taxonomy and total read counts to this data.frame
+prevdf = data.frame(Prevalence = prevdf,
+                    TotalAbundance = taxa_sums(s16_5),
+                    tax_table(s16_5))
+
+#View(prevdf)
+#write.csv(prevdf, file = "prevalencia.csv")
+
+plyr::ddply(prevdf, "Phylum", function(df1)
+  {cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
+
+# Filtering phyla whose prevalence is 0
+filterPhyla = c("Campylobacterota", "Crenarchaeota", "Euryarchaeota",
+                "Fibrobacterota", "Patescibacteria", "Synergistota")
+# Filter entries with low prevalence Phylum.
+s16_6 = subset_taxa(s16_5, !Phylum %in% filterPhyla)
+s16_6
+
+
+# Plotting total abundance to phylum level
+plot_bar(s16_6, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
-# Abundancia relativa de secuencias 
-s16_5_re = transform_sample_counts(s16_5, function(x) x / sum(x))
-s16_5_re
-# Abundancia relativa a nivel de Phylum
-plot_bar(s16_5_re, fill = "Phylum")+ 
+# Plotting relative abundance to phylum level 
+s16_6_re = transform_sample_counts(s16_6, function(x) x / sum(x))
+plot_bar(s16_6_re, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
-
-
-blancos = subset_samples(s16_1, condicion=="na")
-blancos
-blancos = subset_taxa(blancos, Order != "Chloroplast")
-blancos
-blancos = subset_taxa(blancos, Family != "Mitochondria")
-blancos
-# abundancia total a nivel de Phylum
-plot_bar(blancos, fill = "Class")+ 
-  geom_bar(aes(color = Class), stat = "identity", position = "stack")
-reads_sample = readcount(blancos)
-reads_sample[1:5]
-write.csv(reads_sample, file = "reads_blancos.csv")
 
 #### NORMALIZATION METHODS ####
 # Proportion Normalization

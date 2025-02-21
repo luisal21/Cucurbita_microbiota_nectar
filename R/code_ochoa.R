@@ -146,7 +146,8 @@ prevdf = data.frame(prevalence = prevdf,
 
 
 #Compute total and average prevalence for each phylum
-plyr::ddply(prevdf, "Phylum", function(df1){cbind(mean(df1$prevalence), sum(df1$prevalence))})
+plyr::ddply(prevdf, "Phylum", function(df1)
+  {cbind(mean(df1$prevalence), sum(df1$prevalence))})
 
 
 #Phyla whose prevalence is 1, that is, only occurs in one sample

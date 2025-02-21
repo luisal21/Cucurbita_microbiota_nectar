@@ -184,6 +184,9 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,200),
                      maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
                      compress=TRUE, multithread=TRUE) # On Windows set multithread=FALSE
 
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,200),
+                     trimLeft=c(20,20), maxN=0, maxEE=c(2,2), truncQ=2, 
+                     rm.phix=TRUE, compress=TRUE, multithread=TRUE)
 
 # muestra cuantas secuencias pasaron el filtrado
 head(out)

@@ -1,20 +1,34 @@
 ### Análisis de las secuencias de 16s
 
+devtools::install_github("microsud/microbiomeutilities")
+
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq); packageVersion("phyloseq")
 library(ggplot2)
-library(VennDiagram) # no instalado
+#library(VennDiagram) # no instalado
 library(picante)
 library(ape)
 library("microbiome")
 library("dplyr")
-library("hrbrthemes") # no instalado
-library("gcookbook") # no instalado
+#library("hrbrthemes") # no instalado
+#library("gcookbook") # no instalado
 #library("tidyverse")
 library("RColorBrewer")
 library("ggpubr")
-library("breakaway") # no instalado
+#library("breakaway") # no instalado
+#library(MicrobiotaProcess)
+#library(reltools)
+library(microbiomeutilities)
+library(vegan)
+library(gridExtra)
+library(tidyr)
+library(reshape2)
+library(UpSetR)
+library(minpack.lm)
+library(Hmisc)
+library(stats4)
+library(patchwork)
 
 
 #### Set up directory in which the databases are located ####
@@ -23,11 +37,11 @@ setwd("/home/luis/Documents/papers_publicados/paper2_tesisDoctorado/Cucurbita_mi
 ### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
 # deshabilitar este codigo
 ### Transponer tabla de ASV
-asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
-head(asvtable)
-asv2 = t(asvtable)
-head(asv2, 1)
-write.csv(asv2, file = "asv_table.csv")
+#asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
+#head(asvtable)
+#asv2 = t(asvtable)
+#head(asv2, 1)
+#write.csv(asv2, file = "asv_table.csv")
 
 # cargar primero el archivo de metadatos
 meta_16s <- read.csv("meta_16s_2024.csv", header = T)
@@ -58,9 +72,10 @@ s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   tax_table(as.matrix(taxo_16s)), 
                   sample_data(meta_16s))
 s16_1
+
 # obteniendo el arbol filogenetico
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
-plot(arbol_16s)
+#plot(arbol_16s)
 # Uniendo el arbol con el objeto phyloseq anterior
 s16_2 = merge_phyloseq(s16_1, arbol_16s)
 s16_2
@@ -69,56 +84,61 @@ s16_3 = subset_samples(s16_2, sitio=="morelia")
 s16_3
 
 # Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_2) # reads totales 8,967,271
+summarize_phyloseq(s16_3) # reads totales 5,757,299
 
 # información del número de reads
-summary(sample_sums(s16_2))
-
-#### grafica de abundancia con phyloseq
-# creamos una primera visualización de la abundancia total de secuencias por
-# muestra a nivel de Reino
-plot_bar(s16_2, fill = "Kingdom") +
-  geom_bar(aes(color = Kingdom), stat = "identity",
-           position = "stack")
-# abundancia total de secuencias a nivel de Phylum
-plot_bar(s16_2, fill = "Phylum") +
-  geom_bar(aes(color = Phylum), stat = "identity",
-           position = "stack")
+summary(sample_sums(s16_3))
 
 ##### Extraemos todas aquellas secuencias de bacterias #####
-s16_3 = subset_taxa(s16_2, Kingdom == "Bacteria")
-s16_3
-s16_3 = subset_taxa(s16_3, Order != "Chloroplast")
-s16_3
-s16_3 = subset_taxa(s16_3, Family != "Mitochondria")
-s16_3
-
-# Despues extraemos las muestras que pertenecen a Morelia 
-s16_4 = subset_samples(s16_3, sitio=="morelia")
+s16_4 = subset_samples(s16_3, condicion!="na")
 s16_4
+s16_4 = subset_taxa(s16_4, Order != "Chloroplast")
+s16_4
+s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
+s16_4
+
 # Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
 # pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
 # muestras que quedaron con 0 secuencias:
 s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
 s16_5
+#Final ASV data set: 4655 ASVs
 summary(sample_sums(s16_5))
 summarize_phyloseq(s16_5)
+
 # Obteniendo el número de read por muestra
 reads_sample = readcount(s16_5)
 reads_sample[1:5]
-#write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
+write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
+range(sample_sums(s16_5))
+#Library size spans 2 - 5691 reads 
 
 # abundancia total a nivel de Phylum
 plot_bar(s16_5, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
-# Abundancia relativa de secuencias del reino fungi
+# Abundancia relativa de secuencias 
 s16_5_re = transform_sample_counts(s16_5, function(x) x / sum(x))
 s16_5_re
+# Abundancia relativa a nivel de Phylum
 plot_bar(s16_5_re, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
+
+
+blancos = subset_samples(s16_1, condicion=="na")
+blancos
+blancos = subset_taxa(blancos, Order != "Chloroplast")
+blancos
+blancos = subset_taxa(blancos, Family != "Mitochondria")
+blancos
+# abundancia total a nivel de Phylum
+plot_bar(blancos, fill = "Class")+ 
+  geom_bar(aes(color = Class), stat = "identity", position = "stack")
+reads_sample = readcount(blancos)
+reads_sample[1:5]
+write.csv(reads_sample, file = "reads_blancos.csv")
 
 #### NORMALIZATION METHODS ####
 # Proportion Normalization
@@ -129,84 +149,123 @@ s16_prop <- transform(s16_5, "compositional")
 otu_table(s16_prop)[1:10, 1:10]
 head(sample_sums(s16_prop))
 
-#write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
+write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
 
 ### OTROS METODOS DE NORMALIZACION
 # Curvas de Rarefacción
-otu_tab = t(abundances(its5))
+otu_tab = t(abundances(s16_5))
 p = vegan::rarecurve(otu_tab,
                      step = 50, label = FALSE,
                      sample = min(rowSums(otu_tab),
                                   col = "blue, cex = 0.6"))
 
-rarecurve(t(otu_table(its5)), step=50, cex=0.5)
+rarecurve(t(otu_table(s16_5)), step=50, cex=0.5)
 
-# rarefy without replacement
-ps.rarefied = rarefy_even_depth(its5, rngseed=1, 
-                                sample.size=0.9*min(sample_sums(its5)),
-                                replace=F)
-ps.rarefied
-reads_sample2 = readcount(ps.rarefied)
-reads_sample2[1:5]
-#
-its6 = prune_samples(sample_sums(its5) >= 5, its5)
+### Normalize library size to 1000 reads
+ps.rarefied1000 <- rarefy_even_depth(s16_5, 
+                                    1000, rngseed = 1,
+                                    replace = FALSE)             
+ps.rarefied1000
+# phyloseq object with normalized library size has
+# 784 ASVs in 18 samples
 
-# rarefy_even_depth
-ps.rarefied = rarefy_even_depth(its6, rngseed=1, 
-                                sample.size=5,
-                                replace=F)
-# Elegi el submuestreo con un valor de 10 reads por muestra
-ps.rarefied
-summarize_phyloseq(ps.rarefied)
-summary(sample_sums(ps.rarefied))
-abundances(ps.rarefied)
+### Normalize library size to 100 reads
+ps.rarefied100 <- rarefy_even_depth(s16_5, 
+                                   100, rngseed = 1,
+                                   replace = FALSE)             
+ps.rarefied100
+# phyloseq object with normalized library size has
+# 1600 ASVs in 123 samples
 
-##### DESeq2 #### No correr por ahora
-# install package
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+### Normalize library size to 50 reads
+ps.rarefied50 <- rarefy_even_depth(s16_5, 
+                             50, rngseed = 1,
+                             replace = FALSE)             
+ps.rarefied50
+# phyloseq object with normalized library size has
+# 1421 ASVs in 149 samples
+reads_sample2 = readcount(ps.rarefied50)
+reads_sample2[1:20]
+summarize_phyloseq(ps.rarefied50)
+summary(sample_sums(ps.rarefied50))
+abundances(ps.rarefied50)
 
-BiocManager::install("DESeq2")
+### Normalize library size to 10 reads
+ps.rarefied10 <- rarefy_even_depth(s16_5, 
+                                   10, rngseed = 1,
+                                   replace = FALSE)             
+ps.rarefied10
+# phyloseq object with normalized library size has
+# 824 ASVs in 209 samples
 
-library(DESeq2)
+#### HEATMAPs of most abundant bacteria ####
 
-kostic <- prune_samples(sample_sums(its5) > 10, its5)
-kostic
+### Collapse dataset taxonomy to 10 most abundant families
 
-sample_data(kostic)$condicion <- as.factor(sample_data(kostic)$condicion)
+topfam <- aggregate_top_taxa2(ps.rarefied50, "Family", top = 20)
+View(otu_table(topfam))
+# transform families dataset to relative abundance
 
-# Convert to DESeq2 object
-DESeq2_Object <- phyloseq_to_deseq2(kostic, ~ condicion)
-#> converting counts to integer mode
-#> Warning in DESeqDataSet(se, design = design, ignoreRank): some variables in
-#> design formula are characters, converting to factors
+famrel <- transform(topfam, "compositional")
+View(otu_table(famrel))
 
-# calculate geometric means prior to estimate size factors
-gm_mean = function(x, na.rm=TRUE){
-  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
-}
-geoMeans = apply(counts(DESeq2_Object), 1, gm_mean)
-DESeq2_dds = estimateSizeFactors(DESeq2_Object, geoMeans = geoMeans)
-DESeq2_dds = DESeq(DESeq2_dds, fitType="local")
-#> using pre-existing size factors
-#> estimating dispersions
-#> gene-wise dispersion estimates
-#> mean-dispersion relationship
-#> final dispersion estimates
-#> fitting model and testing
+### Define colors for heatmap
+heat.cols <- c("#a8dadc","#457b9d", "#1d3557")
+### Create a gradient color palette for abundance
+grad_ab <- colorRampPalette(c("#96d4ca","#d3f3f1", "#7c65a9"))
+heat.cols <- grad_ab(20)
 
-# Explore results
-res = results(DESeq2_dds)
-res = res[order(res$padj, na.last=NA), ]
-alpha = 0.01
-sigtab = res[(res$padj < alpha), ]
-sigtab = cbind(as(sigtab, "data.frame"),
-               as(tax_table(kostic)[rownames(sigtab), ], "matrix"))
-head(sigtab)
+### Heatmap for 10 most abundant bacterial families in king penguin body sites
 
-posigtab = sigtab[sigtab[, "log2FoldChange"] > 0, ]
-posigtab = posigtab[, c("baseMean", "log2FoldChange", "lfcSE", "padj",
-                        "Phylum", "Class", "Family", "Genus")]
+heatmap_k <- simple_heatmap(famrel,
+                            group.facet = "especies",
+                            group.order = NULL,
+                            abund.thres = 0.01,
+                            prev.thres = 0.01,
+                            level = "Family",
+                            scale.color = "log10",
+                            na.fill = "white",
+                            color.fill = heat.cols,
+                            taxa.arrange=TRUE,
+                            remove.other=TRUE,
+                            panel.arrange="grid",
+                            ncol=NULL,
+                            nrow=NULL)
+heatmap_k
+
+#### TOP FIVE FAMILIES ####
+library(microbiomeutilities)
+
+kcols <- c("steelblue", "grey50", "red2", "green4", "yellow4", "pink4")
+
+pn <- plot_taxa_boxplot(ps.rarefied50,
+                        taxonomic.level = "Family",
+                        top.otu = 5, 
+                        group = "especies",
+                        add.violin= FALSE,
+                        title = "Top five families", 
+                        keep.other = FALSE,
+                        #group.order = c("back","chest","foot"),
+                        group.colors = kcols,
+                        dot.size = 1)
+
+print(pn + theme_biome_utils())
+
+pn$data
+View(pn$data)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #### ALPHA DIVERSITY ####
@@ -830,3 +889,58 @@ mycols <- c(nonCRC="#d6e2e9", CRC="#cbf3f0", H="#fcf5c7")
 
 plot(venn(list_core),
      fills = mycols)
+###############################################################################
+###############################################################################
+###############################################################################
+### Código que sobra
+##### DESeq2 #### No correr por ahora
+# install package
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("DESeq2")
+
+library(DESeq2)
+
+kostic <- prune_samples(sample_sums(its5) > 10, its5)
+kostic
+
+sample_data(kostic)$condicion <- as.factor(sample_data(kostic)$condicion)
+
+# Convert to DESeq2 object
+DESeq2_Object <- phyloseq_to_deseq2(kostic, ~ condicion)
+#> converting counts to integer mode
+#> Warning in DESeqDataSet(se, design = design, ignoreRank): some variables in
+#> design formula are characters, converting to factors
+
+# calculate geometric means prior to estimate size factors
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans = apply(counts(DESeq2_Object), 1, gm_mean)
+DESeq2_dds = estimateSizeFactors(DESeq2_Object, geoMeans = geoMeans)
+DESeq2_dds = DESeq(DESeq2_dds, fitType="local")
+#> using pre-existing size factors
+#> estimating dispersions
+#> gene-wise dispersion estimates
+#> mean-dispersion relationship
+#> final dispersion estimates
+#> fitting model and testing
+
+# Explore results
+res = results(DESeq2_dds)
+res = res[order(res$padj, na.last=NA), ]
+alpha = 0.01
+sigtab = res[(res$padj < alpha), ]
+sigtab = cbind(as(sigtab, "data.frame"),
+               as(tax_table(kostic)[rownames(sigtab), ], "matrix"))
+head(sigtab)
+
+posigtab = sigtab[sigtab[, "log2FoldChange"] > 0, ]
+posigtab = posigtab[, c("baseMean", "log2FoldChange", "lfcSE", "padj",
+                        "Phylum", "Class", "Family", "Genus")]
+
+
+
+
+

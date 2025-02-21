@@ -38,7 +38,6 @@ setwd("/home/luis/Documents/papers_publicados/paper2_tesisDoctorado/Cucurbita_mi
 # deshabilitar este codigo
 ### Transponer tabla de ASV
 #asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
-#head(asvtable)
 #asv2 = t(asvtable)
 #head(asv2, 1)
 #write.csv(asv2, file = "asv_table.csv")
@@ -84,7 +83,7 @@ s16_3 = subset_samples(s16_2, sitio=="morelia")
 s16_3
 
 # Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_3) # reads totales 5,757,299
+summarize_phyloseq(s16_3) # reads totales 9,725,000
 
 # información del número de reads
 summary(sample_sums(s16_3))
@@ -102,7 +101,7 @@ s16_4
 # muestras que quedaron con 0 secuencias:
 s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
 s16_5
-#Final ASV data set: 4655 ASVs
+#Final ASV data set: 3126 ASVs
 summary(sample_sums(s16_5))
 summarize_phyloseq(s16_5)
 
@@ -112,7 +111,7 @@ reads_sample[1:5]
 write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
 range(sample_sums(s16_5))
-#Library size spans 2 - 5691 reads 
+#Library size spans 2 - 24079 reads 
 
 # abundancia total a nivel de Phylum
 plot_bar(s16_5, fill = "Phylum")+ 
@@ -167,7 +166,7 @@ ps.rarefied1000 <- rarefy_even_depth(s16_5,
                                     replace = FALSE)             
 ps.rarefied1000
 # phyloseq object with normalized library size has
-# 784 ASVs in 18 samples
+# 747 ASVs in 39 samples
 
 ### Normalize library size to 100 reads
 ps.rarefied100 <- rarefy_even_depth(s16_5, 
@@ -175,7 +174,7 @@ ps.rarefied100 <- rarefy_even_depth(s16_5,
                                    replace = FALSE)             
 ps.rarefied100
 # phyloseq object with normalized library size has
-# 1600 ASVs in 123 samples
+# 903 ASVs in 134 samples
 
 ### Normalize library size to 50 reads
 ps.rarefied50 <- rarefy_even_depth(s16_5, 
@@ -183,7 +182,7 @@ ps.rarefied50 <- rarefy_even_depth(s16_5,
                              replace = FALSE)             
 ps.rarefied50
 # phyloseq object with normalized library size has
-# 1421 ASVs in 149 samples
+# 806 ASVs in 168 samples
 reads_sample2 = readcount(ps.rarefied50)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied50)
@@ -196,13 +195,13 @@ ps.rarefied10 <- rarefy_even_depth(s16_5,
                                    replace = FALSE)             
 ps.rarefied10
 # phyloseq object with normalized library size has
-# 824 ASVs in 209 samples
+# 413 ASVs in 220 samples
 
 #### HEATMAPs of most abundant bacteria ####
 
 ### Collapse dataset taxonomy to 10 most abundant families
 
-topfam <- aggregate_top_taxa2(ps.rarefied50, "Family", top = 20)
+topfam <- aggregate_top_taxa2(ps.rarefied50, "Family", top = 10)
 View(otu_table(topfam))
 # transform families dataset to relative abundance
 
@@ -213,7 +212,7 @@ View(otu_table(famrel))
 heat.cols <- c("#a8dadc","#457b9d", "#1d3557")
 ### Create a gradient color palette for abundance
 grad_ab <- colorRampPalette(c("#96d4ca","#d3f3f1", "#7c65a9"))
-heat.cols <- grad_ab(20)
+heat.cols <- grad_ab(10)
 
 ### Heatmap for 10 most abundant bacterial families in king penguin body sites
 

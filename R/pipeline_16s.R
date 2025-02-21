@@ -27,8 +27,8 @@ cl  <- makeCluster(4)
 
 # Cargamos los paquetes requeridos
 library(dada2)
-library(ShortRead)
-library(Biostrings)
+#library(ShortRead)
+#library(Biostrings)
 
 # Moverme al directorio donde se encuentran las muestras:
 path <- "/home/.lvillanueva/work/analisis_2024/16s"
@@ -193,10 +193,10 @@ head(out)
 
 # Aprendiendo las tasas de error
 errF <- learnErrors(filtFs, multithread=TRUE)
-# 101668613 total bases in 438036 reads from 15 samples will be used for 
+# 103181760 total bases in 469008 reads from 15 samples will be used for
 # learning the error rates.
 errR <- learnErrors(filtRs, multithread=TRUE)
-# 01224846 total bases in 438036 reads from 15 samples will be used for
+# 105716520 total bases in 587314 reads from 18 samples will be used for
 # learning the error rates.
 
 # Graficando tasas de error
@@ -231,6 +231,7 @@ head(seqtab.nochim)
 sum(seqtab.nochim)/sum(seqtab)
 # 0.798244
 # 0.584593 19/02/2025
+# 0.9757 20/02/2025
 # Inspect distribution of sequence lengths without quimeras
 table(nchar(getSequences(seqtab.nochim)))
 

@@ -88,25 +88,6 @@ s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
 # pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
 # muestras que quedaron con 0 secuencias:
 s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
-s16_5 # Final ASV data set: 3126 ASVs
-
-# Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_5) # reads totales 155,244
-
-# información del número de reads
-summary(sample_sums(s16_5))
-range(sample_sums(s16_5))
-#Library size spans 2 - 24079 reads 
-
-# Obteniendo el número de read por muestra
-reads_sample = readcount(s16_5)
-reads_sample[1:5]
-write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
-
-
-
-rank_names(s16_5)
-table(tax_table(s16_5)[, "Phylum"], exclude = NULL)
 
 # A useful next step is to explore feature prevalence in the dataset,
 # which we will define here as the number of samples in which a taxa appears
@@ -120,20 +101,31 @@ prevdf = apply(X = otu_table(s16_5),
 prevdf = data.frame(Prevalence = prevdf,
                     TotalAbundance = taxa_sums(s16_5),
                     tax_table(s16_5))
-
 #View(prevdf)
 #write.csv(prevdf, file = "prevalencia.csv")
 
 plyr::ddply(prevdf, "Phylum", function(df1)
-  {cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
+{cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
 
 # Filtering phyla whose prevalence is 0
 filterPhyla = c("Campylobacterota", "Crenarchaeota", "Euryarchaeota",
                 "Fibrobacterota", "Patescibacteria", "Synergistota")
 # Filter entries with low prevalence Phylum.
 s16_6 = subset_taxa(s16_5, !Phylum %in% filterPhyla)
-s16_6
+s16_6 # Final ASV data set: 3116 ASVs
 
+# Primero resumimos el contenido del objeto phyloseq
+summarize_phyloseq(s16_6) # reads totales 155,244
+
+# información del número de reads
+summary(sample_sums(s16_6))
+range(sample_sums(s16_6))
+#Library size spans 2 - 24079 reads 
+
+# Obteniendo el número de read por muestra
+reads_sample = readcount(s16_6)
+reads_sample[1:5]
+write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
 # Plotting total abundance to phylum level
 plot_bar(s16_6, fill = "Phylum")+ 
@@ -154,41 +146,74 @@ s16_prop <- transform(s16_5, "compositional")
 otu_table(s16_prop)[1:10, 1:10]
 head(sample_sums(s16_prop))
 
+### Abundance value transformation
+plot_abundance = function(physeq,title = "",
+                          Facet = "Order", Color = "Phylum"){
+  # Arbitrary subset, based on Phylum, for plotting
+  p1f = subset_taxa(physeq, Phylum %in% c("Bacteroidota"))
+  mphyseq = psmelt(p1f)
+  mphyseq <- subset(mphyseq, Abundance > 0)
+  ggplot(data = mphyseq, mapping = aes_string(x = "sexo",y = "Abundance",
+                                              color = Color, fill = Color)) +
+    geom_violin(fill = NA) +
+    geom_point(size = 1, alpha = 0.3,
+               position = position_jitter(width = 0.3)) +
+    facet_wrap(facets = Facet) + scale_y_log10()+
+    theme(legend.position="none")
+}
+
+# Transform to relative abundance. Save as new object.
+ps3ra = transform_sample_counts(s16_6, function(x){x / sum(x)})
+
+#Now plot the abundance values before and after transformation.
+plotBefore = plot_abundance(s16_6,"")
+plotAfter = plot_abundance(ps3ra,"")
+# Combine each plot into one graphic.
+grid.arrange(nrow = 2, plotBefore, plotAfter)
+
+
+
+
 write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
 
 ### OTROS METODOS DE NORMALIZACION
 # Curvas de Rarefacción
-otu_tab = t(abundances(s16_5))
+otu_tab = t(abundances(s16_6))
 p = vegan::rarecurve(otu_tab,
                      step = 50, label = FALSE,
                      sample = min(rowSums(otu_tab),
                                   col = "blue, cex = 0.6"))
 
-rarecurve(t(otu_table(s16_5)), step=50, cex=0.5)
+vegan::rarecurve(t(otu_table(s16_6)), step=50, cex=0.5)
 
 ### Normalize library size to 1000 reads
-ps.rarefied1000 <- rarefy_even_depth(s16_5, 
+ps.rarefied1000 <- rarefy_even_depth(s16_6, 
                                     1000, rngseed = 1,
                                     replace = FALSE)             
 ps.rarefied1000
 # phyloseq object with normalized library size has
-# 747 ASVs in 39 samples
+# 754 ASVs in 39 samples
 
 ### Normalize library size to 100 reads
-ps.rarefied100 <- rarefy_even_depth(s16_5, 
+ps.rarefied100 <- rarefy_even_depth(s16_6, 
                                    100, rngseed = 1,
                                    replace = FALSE)             
 ps.rarefied100
 # phyloseq object with normalized library size has
-# 903 ASVs in 134 samples
+# 906 ASVs in 134 samples
+reads_sample2 = readcount(ps.rarefied100)
+reads_sample2[1:20]
+summarize_phyloseq(ps.rarefied100)
+summary(sample_sums(ps.rarefied100))
+abundances(ps.rarefied100)
 
 ### Normalize library size to 50 reads
-ps.rarefied50 <- rarefy_even_depth(s16_5, 
+ps.rarefied50 <- rarefy_even_depth(s16_6, 
                              50, rngseed = 1,
                              replace = FALSE)             
 ps.rarefied50
 # phyloseq object with normalized library size has
-# 806 ASVs in 168 samples
+# 785 ASVs in 168 samples
 reads_sample2 = readcount(ps.rarefied50)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied50)
@@ -196,21 +221,21 @@ summary(sample_sums(ps.rarefied50))
 abundances(ps.rarefied50)
 
 ### Normalize library size to 10 reads
-ps.rarefied10 <- rarefy_even_depth(s16_5, 
+ps.rarefied10 <- rarefy_even_depth(s16_6, 
                                    10, rngseed = 1,
                                    replace = FALSE)             
 ps.rarefied10
 # phyloseq object with normalized library size has
-# 413 ASVs in 220 samples
+# 392 ASVs in 220 samples
 
 #### HEATMAPs of most abundant bacteria ####
 
 ### Collapse dataset taxonomy to 10 most abundant families
 
-topfam <- aggregate_top_taxa2(ps.rarefied50, "Family", top = 10)
+topfam <- aggregate_top_taxa2(ps.rarefied100, "Family", top = 10)
 View(otu_table(topfam))
 # transform families dataset to relative abundance
-
+transform <- microbiome::transform
 famrel <- transform(topfam, "compositional")
 View(otu_table(famrel))
 

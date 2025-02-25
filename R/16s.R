@@ -23,11 +23,11 @@ library(vegan)
 library(gridExtra)
 library(tidyr)
 library(reshape2)
-library(UpSetR) # no instalado
-library(minpack.lm) # no instalado
+#library(UpSetR) # no instalado
+#library(minpack.lm) # no instalado
 library(Hmisc)
 library(stats4)
-library(patchwork) # no instalado
+#library(patchwork) # no instalado
 
 
 #### Set up directory in which the databases are located ####
@@ -81,7 +81,7 @@ s16_2
 # Filtering samples of Morelia site
 s16_3 = subset_samples(s16_2, sitio=="morelia")
 # Removing Chloroplast and Mitochondria sequences and na samples in condition
-s16_4 = subset_samples(s16_3, condicion!="na")
+s16_4 = subset_samples(s16_3, condicion !="na")
 s16_4 = subset_taxa(s16_4, Order != "Chloroplast")
 s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
 # Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
@@ -142,7 +142,7 @@ plot_bar(s16_6_re, fill = "Phylum")+
 # Primero nos aseguramos que estamos usando las funciones del paquete correcto
 # Paquete microbiome
 transform <- microbiome::transform
-s16_prop <- transform(s16_5, "compositional")
+s16_prop <- transform(s16_6, "compositional")
 otu_table(s16_prop)[1:10, 1:10]
 head(sample_sums(s16_prop))
 
@@ -172,21 +172,20 @@ plotAfter = plot_abundance(ps3ra,"")
 grid.arrange(nrow = 2, plotBefore, plotAfter)
 
 
-
-
 write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
 
-### OTROS METODOS DE NORMALIZACION
-# Curvas de Rarefacción
+                  ### OTROS METODOS DE NORMALIZACION
+                         ### RAREFIED DATA ###
 otu_tab = t(abundances(s16_6))
 p = vegan::rarecurve(otu_tab,
                      step = 50, label = FALSE,
                      sample = min(rowSums(otu_tab),
                                   col = "blue, cex = 0.6"))
 
-vegan::rarecurve(t(otu_table(s16_6)), step=50, cex=0.5)
+#vegan::rarecurve(t(otu_table(s16_6)), step=50, cex=0.5)
 
 ### Normalize library size to 1000 reads
+set.seed(111)
 ps.rarefied1000 <- rarefy_even_depth(s16_6, 
                                     1000, rngseed = 1,
                                     replace = FALSE)             
@@ -195,6 +194,7 @@ ps.rarefied1000
 # 754 ASVs in 39 samples
 
 ### Normalize library size to 100 reads
+set.seed(111)
 ps.rarefied100 <- rarefy_even_depth(s16_6, 
                                    100, rngseed = 1,
                                    replace = FALSE)             
@@ -208,6 +208,7 @@ summary(sample_sums(ps.rarefied100))
 abundances(ps.rarefied100)
 
 ### Normalize library size to 50 reads
+set.seed(111)
 ps.rarefied50 <- rarefy_even_depth(s16_6, 
                              50, rngseed = 1,
                              replace = FALSE)             
@@ -221,6 +222,7 @@ summary(sample_sums(ps.rarefied50))
 abundances(ps.rarefied50)
 
 ### Normalize library size to 10 reads
+set.seed(111)
 ps.rarefied10 <- rarefy_even_depth(s16_6, 
                                    10, rngseed = 1,
                                    replace = FALSE)             
@@ -228,6 +230,96 @@ ps.rarefied10
 # phyloseq object with normalized library size has
 # 392 ASVs in 220 samples
 
+# sampling depth
+barplot(sample_sums(ps.rarefied50), las = 2)
+
+# taxa prevalence
+plot_taxa_prevalence(s16_6, "Phylum")
+plot_taxa_prevalence(ps.rarefied50, "Phylum")
+
+#### ALPHA DIVERSITY WITH RAREFIED DATA  ####
+library(knitr)
+
+div1 = microbiome::alpha(ps.rarefied50, index = "all")
+kable(head(div1))
+View(div1)
+
+### RICHNESS
+tab <- richness(ps.rarefied50)
+kable(head(tab))
+
+### DOMINANCE
+tab2 <- dominance(ps.rarefied50, index = "all")
+kable(head(tab2))
+
+### RARITY AND LOW ABUNDANCE
+tab3 <- rarity(ps.rarefied50, index = "all")
+kable(head(tab3))
+
+# COVERAGE
+tab4 <- coverage(ps.rarefied50, threshold = 0.5)
+kable(head(tab4))
+sort(tab4)
+
+# CORE ABUNDANCE
+tab5 <- core_abundance(ps.rarefied50, detection = 2/100, prevalence = 10/100)
+kable(head(tab5))
+
+# get the metadata out as separate object
+ps1.meta <- meta(ps.rarefied50)
+kable(head(ps1.meta))
+# Add the rownames as a new colum for easy integration later.
+ps1.meta$sam_name <- rownames(ps1.meta)
+
+# Add the rownames to diversity table
+div1$sam_name <- rownames(div1)
+
+# merge these two data frames into one
+div.df <- merge(div1,ps1.meta, by = "sam_name")
+
+# check the tables
+colnames(div.df)
+
+# Now use this data frame to plot 
+p <- ggboxplot(div.df, 
+               x = "especies", 
+               y = "diversity_shannon",
+               fill = "especies", 
+               palette = "jco")
+
+#p <- p + rotate_x_text()
+print(p)
+
+
+
+# VISUALIZATION
+p.shannon <- boxplot_alpha(ps.rarefied50, 
+                           index = "shannon",
+                           x_var = "especies")
+
+#fill.colors = c(female="cyan4", male="deeppink4"))
+
+p.shannon <- p.shannon + theme_minimal() + 
+  labs(x="Species", y="Shannon diversity") +
+  theme(axis.text = element_text(size=12),
+        axis.title = element_text(size=16),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size=16))
+p.shannon
+
+######## analisis estadistica de diversidad alfa
+pairwise.wilcox.test(div1$observed, sample_data(ps.rarefied50)$especies)
+pairwise.wilcox.test(div1$diversity_shannon, sample_data(ps.rarefied50)$especies)
+pairwise.wilcox.test(div1$observed, sample_data(ps.rarefied100)$especies)
+pairwise.wilcox.test(div1$diversity_shannon, sample_data(ps.rarefied100)$especies)
+
+
+
+
+
+
+
+#### ANALYSIS WITH RAREFIED DATA ####
 #### HEATMAPs of most abundant bacteria ####
 
 ### Collapse dataset taxonomy to 10 most abundant families
@@ -293,22 +385,18 @@ View(pn$data)
 
 
 
-
-
-
-
-
-#### ALPHA DIVERSITY ####
+#### ALPHA DIVERSITY WITH PROPORTIONS DATA  ####
 library(knitr)
 
 # Primero nos aseguramos que estamos usando las funciones del paquete correcto
 transform <- microbiome::transform
 # Proportion Normalization
-pseq_16s <- transform(s16_5, "compositional")
+pseq_16s <- transform(s16_6, "compositional")
 
 # Obteniendo los valores de las metricas de diversidad alfa
-#div1 = microbiome::alpha(pseq_16s, index = "all")
-#kable(head(div1))
+div1 = microbiome::alpha(pseq_16s, index = "all")
+kable(head(div1))
+View(div1)
 
 tab_16 <- microbiome::alpha(pseq_16s, index = c("observed","shannon", "simpson",
                                                 "absolute", "low_abundance",
@@ -367,11 +455,13 @@ tab$low_abundance
 
 
 ######## analisis estadistica de diversidad alfa
-pairwise.wilcox.test(tab$observed, sample_data(pseq_16s)$especies)
+pairwise.wilcox.test(tab$observed, sample_data(ps.rarefied100)$especies)
+
 pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$condicion)
 pairwise.wilcox.test(tab$observed, sample_data(pseq)$especie)
 
 pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$especie)
+
 
 # análisis estadístico del tamaño del polen con una prueba de kruskal-wallis
 kruskal.test(ps1.meta$Shannon ~ sample_data(ps1.meta)$especies)

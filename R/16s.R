@@ -314,8 +314,24 @@ pairwise.wilcox.test(div1$observed, sample_data(ps.rarefied100)$especies)
 pairwise.wilcox.test(div1$diversity_shannon, sample_data(ps.rarefied100)$especies)
 
 
+## Phylogenetic diversity
+library(picante)
 
+ps0.rar.asvtab <- as.data.frame(ps.rarefied50@otu_table)
 
+ps0.rar.tree <- ps.rarefied50@phy_tree
+
+# hmp.meta from previous code chunks
+
+# We first need to check if the tree is rooted or not 
+ps.rarefied50@phy_tree
+
+# it is a rooted tree
+df.pd <- pd(t(ps0.rar.asvtab), ps0.rar.tree,include.root=T) 
+# t(ou_table) transposes the table for use in picante and the tre file comes
+# from the first code chunck we used to read tree file (see making a phyloseq 
+# object section).
+datatable(df.pd)
 
 
 
@@ -478,7 +494,7 @@ pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$tratamiento)
 
 # VISUALIZATION de diversidad alfa
 ### stripchart de Observed
-ggplot(ps1.meta, aes(x=tratamiento, y=observed, color=tratamiento)) +
+ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 3)+
   scale_shape_manual(values=c(1,19))+
@@ -491,6 +507,7 @@ ggplot(ps1.meta, aes(x=tratamiento, y=observed, color=tratamiento)) +
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
   #                                                       "Visitadas")) +
   theme_bw()
+
 
 #scale_color_discrete(name = "Especies", 
 #                     labels = c("1CF" = "CF","2CPF" = "CPF", "3CPP"="CPP",

@@ -306,11 +306,20 @@ shapiro.test(df.pd$PD)
 
 
 ### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
+library(emmeans)
 # Richness
 mod1 = glm(observed ~ especies*sexo*tratamiento, data = div.df,
            family = poisson)
 summary(mod1)
 anova(mod1)
+emmeans(mod1, 
+        specs = pairwise ~ especies, 
+        type = "response")
+
+emmeans(mod1, 
+        specs = pairwise ~ especies | sexo, 
+        type = "response")
+
 
 # Shannon
 mod2 = glm(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)

@@ -125,7 +125,7 @@ range(sample_sums(s16_6))
 # Obteniendo el número de read por muestra
 reads_sample = readcount(s16_6)
 reads_sample[1:5]
-write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
+#write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
 # Plotting total abundance to phylum level
 plot_bar(s16_6, fill = "Phylum")+ 
@@ -136,43 +136,6 @@ s16_6_re = transform_sample_counts(s16_6, function(x) x / sum(x))
 plot_bar(s16_6_re, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
-
-#### NORMALIZATION METHODS ####
-# Proportion Normalization
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-# Paquete microbiome
-transform <- microbiome::transform
-s16_prop <- transform(s16_6, "compositional")
-otu_table(s16_prop)[1:10, 1:10]
-head(sample_sums(s16_prop))
-
-### Abundance value transformation
-plot_abundance = function(physeq,title = "",
-                          Facet = "Order", Color = "Phylum"){
-  # Arbitrary subset, based on Phylum, for plotting
-  p1f = subset_taxa(physeq, Phylum %in% c("Bacteroidota"))
-  mphyseq = psmelt(p1f)
-  mphyseq <- subset(mphyseq, Abundance > 0)
-  ggplot(data = mphyseq, mapping = aes_string(x = "sexo",y = "Abundance",
-                                              color = Color, fill = Color)) +
-    geom_violin(fill = NA) +
-    geom_point(size = 1, alpha = 0.3,
-               position = position_jitter(width = 0.3)) +
-    facet_wrap(facets = Facet) + scale_y_log10()+
-    theme(legend.position="none")
-}
-
-# Transform to relative abundance. Save as new object.
-ps3ra = transform_sample_counts(s16_6, function(x){x / sum(x)})
-
-#Now plot the abundance values before and after transformation.
-plotBefore = plot_abundance(s16_6,"")
-plotAfter = plot_abundance(ps3ra,"")
-# Combine each plot into one graphic.
-grid.arrange(nrow = 2, plotBefore, plotAfter)
-
-
-write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
 
                     #### METODOS DE NORMALIZACION ####
                          #### RAREFIED DATA ####
@@ -215,6 +178,7 @@ ps.rarefied50 <- rarefy_even_depth(s16_6,
 ps.rarefied50 # use this rarefied depth
 # phyloseq object with normalized library size has
 # 785 ASVs in 168 samples
+# 757 asvs in 168 samples 26/02/2025
 reads_sample2 = readcount(ps.rarefied50)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied50)
@@ -1121,5 +1085,40 @@ posigtab = posigtab[, c("baseMean", "log2FoldChange", "lfcSE", "padj",
 
 
 
+#### NORMALIZATION METHODS ####
+# Proportion Normalization
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+# Paquete microbiome
+transform <- microbiome::transform
+s16_prop <- transform(s16_6, "compositional")
+otu_table(s16_prop)[1:10, 1:10]
+head(sample_sums(s16_prop))
 
+### Abundance value transformation
+plot_abundance = function(physeq,title = "",
+                          Facet = "Order", Color = "Phylum"){
+  # Arbitrary subset, based on Phylum, for plotting
+  p1f = subset_taxa(physeq, Phylum %in% c("Bacteroidota"))
+  mphyseq = psmelt(p1f)
+  mphyseq <- subset(mphyseq, Abundance > 0)
+  ggplot(data = mphyseq, mapping = aes_string(x = "sexo",y = "Abundance",
+                                              color = Color, fill = Color)) +
+    geom_violin(fill = NA) +
+    geom_point(size = 1, alpha = 0.3,
+               position = position_jitter(width = 0.3)) +
+    facet_wrap(facets = Facet) + scale_y_log10()+
+    theme(legend.position="none")
+}
+
+# Transform to relative abundance. Save as new object.
+ps3ra = transform_sample_counts(s16_6, function(x){x / sum(x)})
+
+#Now plot the abundance values before and after transformation.
+plotBefore = plot_abundance(s16_6,"")
+plotAfter = plot_abundance(ps3ra,"")
+# Combine each plot into one graphic.
+grid.arrange(nrow = 2, plotBefore, plotAfter)
+
+
+write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
 

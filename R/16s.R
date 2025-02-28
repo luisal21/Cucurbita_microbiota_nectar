@@ -208,27 +208,6 @@ div1 = microbiome::alpha(ps.rarefied50, index = "all")
 kable(head(div1))
 View(div1)
 
-### RICHNESS
-#tab <- richness(ps.rarefied50)
-#kable(head(tab))
-
-### DOMINANCE
-#tab2 <- dominance(ps.rarefied50, index = "all")
-#kable(head(tab2))
-
-### RARITY AND LOW ABUNDANCE
-#tab3 <- rarity(ps.rarefied50, index = "all")
-#kable(head(tab3))
-
-# COVERAGE
-#tab4 <- coverage(ps.rarefied50, threshold = 0.5)
-#kable(head(tab4))
-#sort(tab4)
-
-# CORE ABUNDANCE
-#tab5 <- core_abundance(ps.rarefied50, detection = 2/100, prevalence = 10/100)
-#kable(head(tab5))
-
 # get the metadata out as separate object
 ps1.meta <- meta(ps.rarefied50)
 kable(head(ps1.meta))
@@ -244,80 +223,7 @@ div.df <- merge(div1,ps1.meta, by = "sam_name")
 # check the tables
 colnames(div.df)
 
-# Now use this data frame to plot 
-p <- ggboxplot(div.df, 
-               x = "especies", 
-               y = "diversity_shannon",
-               fill = "especies", 
-               palette = "jco")
-
-#p <- p + rotate_x_text()
-print(p)
-
-# data
-div.df$diversity_shannon
-div.df$observed
-df.pd$PD
-
-# Histograma
-hist(div.df$diversity_shannon) 
-hist(div.df$observed)
-hist(df.pd$PD)
-# Shapiro test
-shapiro.test(div.df$diversity_shannon)
-shapiro.test(div.df$observed)
-shapiro.test(df.pd$PD)
-
-
-### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
-library(emmeans)
-# Richness
-mod1 = glm(observed ~ especies*sexo*tratamiento, data = div.df,
-           family = poisson)
-summary(mod1)
-anova(mod1)
-emmeans(mod1, 
-        specs = pairwise ~ especies, 
-        type = "response")
-
-emmeans(mod1, 
-        specs = pairwise ~ especies | sexo, 
-        type = "response")
-
-
-# Shannon
-mod2 = glm(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
-summary(mod2)
-anova(mod2)
-
-# PD
-mod3 = glm(PD ~ especies*sexo*tratamiento, data = df.pd)
-summary(mod3)
-anova(mod3)
-
-##### VISUALIZATION  OF ALPHA DIVERSITY ####
-p.shannon <- boxplot_alpha(ps.rarefied50, 
-                           index = "shannon",
-                           x_var = "especies")
-p.shannon
-#fill.colors = c(female="cyan4", male="deeppink4"))
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x="Species", y="Shannon diversity") +
-  theme(axis.text = element_text(size=12),
-        axis.title = element_text(size=16),
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=16))
-p.shannon
-
-######## analisis estadistica de diversidad alfa
-pairwise.wilcox.test(div1$observed, sample_data(ps.rarefied50)$especies)
-pairwise.wilcox.test(div1$diversity_shannon, sample_data(ps.rarefied50)$especies)
-pairwise.wilcox.test(div1$observed, sample_data(ps.rarefied100)$especies)
-pairwise.wilcox.test(div1$diversity_shannon, sample_data(ps.rarefied100)$especies)
-
-
-### Phylogenetic diversity
+### Phylogenetic diversity (Faith)
 library(picante)
 
 ps0.rar.asvtab <- as.data.frame(ps.rarefied50@otu_table)
@@ -337,28 +243,357 @@ df.pd <- pd(t(ps0.rar.asvtab), ps0.rar.tree,include.root=T)
 datatable(df.pd)
 
 # We add the results of PD to this file and then plot
-ps1.meta$Phylogenetic_Diversity <- df.pd$PD
-
-# plot PD
-pd.plot <- ggboxplot(ps1.meta,
-                     x = "especies",
-                     y = "Phylogenetic_Diversity",
-                     fill = "especies",
-                     palette = "jco",
-                     ylab = "Phylogenetic Diversity",
-                     xlab = "Species",
-                     legend = "right"
-)
-pd.plot
+div.df$Phylogenetic_Diversity <- df.pd$PD
+head(div.df)
 
 
+# data
+div.df$diversity_shannon
+div.df$observed
+div.df$Phylogenetic_Diversity
+# Histograma
+hist(div.df$diversity_shannon) 
+hist(div.df$observed)
+hist(div.df$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(div.df$diversity_shannon)
+shapiro.test(div.df$observed)
+shapiro.test(div.df$Phylogenetic_Diversity)
+
+
+### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
+library(emmeans)
+# Richness
+mod1 = glm(observed ~ especies*sexo*tratamiento, data = div.df,
+           family = poisson)
+summary(mod1)
+anova(mod1)
+# post-hoc comparisons
+compa1 = emmeans(mod1, 
+        specs = pairwise ~ especies | sexo | tratamiento, 
+        type = "response")
+#write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
+
+# Shannon
+mod2 = glm(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
+summary(mod2)
+anova(mod2)
+# post-hoc comparisons
+compa2 = emmeans(mod2, 
+                 specs = pairwise ~ especies | sexo | tratamiento, 
+                 type = "response")
+#modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
+#summary(modx)
+
+# Phylogenetic Diversity index
+mod3 = glm(Phylogenetic_Diversity ~ especies*sexo*tratamiento, data = div.df)
+summary(mod3)
+anova(mod3)
+# post-hoc comparisons
+compa3 = emmeans(mod3, 
+                 specs = pairwise ~ especies | sexo | tratamiento, 
+                 type = "response")
+
+######## Analysis with kruskal-Wallis and Wilcox text
+# by species
+kruskal.test(div.df$observed~div.df$especies)
+pairwise.wilcox.test(div.df$observed, div.df$especies, exact=F)
+# by sex
+kruskal.test(div.df$observed~div.df$sexo)
+pairwise.wilcox.test(div.df$observed, div.df$sexo, exact=F)
+# by treatment
+kruskal.test(div.df$observed~div.df$tratamiento)
+pairwise.wilcox.test(div.df$observed, div.df$tratamiento, exact=F)
+
+
+##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data####
+# Now use this data frame to plot 
+p.shannon <- boxplot_alpha(ps.rarefied50, 
+                           index = "shannon",
+                           x_var = "especies")
+p.shannon
+#fill.colors = c(female="cyan4", male="deeppink4"))
+
+p.shannon <- p.shannon + theme_minimal() + 
+  labs(x="Species", y="Shannon diversity") +
+  theme(axis.text = element_text(size=12),
+        axis.title = element_text(size=16),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size=16))
+p.shannon
+
+# Stripchart of observed ASVs with 1 panel
+ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 3)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Especies", y = "ASV observados")+
+  scale_color_discrete(name = "Especies", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()
+
+### stripchart de Observed ASVs facet with 4 panels
+ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 3)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Especies", y = "ASV observados")+
+  scale_color_discrete(name = "Especies", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()+
+  facet_wrap(~sexo+tratamiento)
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+
+### stripchart Shannon diversity index by species
+ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+ 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 3)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Especies", y = "Shannon",
+       title = "")+
+  scale_color_discrete(name = "Especies", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()+
+  facet_wrap(~sexo+tratamiento)
+  #stat_summary(fun=mean, geom="point", shape=18,
+  #            size=6, color="red")
+  # shannon_16s_1 = shannon_16s_1 + 
+  #stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+
+### stripchart phylogenetic diversity index
+ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+ 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 3)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Especies", y = "PD",
+       title = "")+
+  scale_color_discrete(name = "Especies", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()+
+  facet_wrap(~sexo+tratamiento)
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+# shannon_16s_1 = shannon_16s_1 + 
+#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+gt <- grid.arrange(shannon_hongos2,shannon_16s, 
+                   ncol = 2, nrow = 1)
+
+
+gt <- grid.arrange(shannon_hongos2, shannon_16s, 
+                   ncol = 2, nrow = 1)
+
+
+gt3 <- grid.arrange(shannon_hongos2, shannon_hongos4, shannon_hongos3,
+                    ncol = 1, nrow = 3)
+
+head(div.df)
+### gráfica del indice de Shannon entre especies y sexo
+pmult <- ggboxplot(div.df, x = "especies", y = "observed", alpha = .5,
+                   fill = "especies", add = "jitter", facet.by = "sexo",
+                   panel.labs = list(sexo = c("female",
+                                              "male")),
+                   short.panel.labs = FALSE)
+pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
+
+labs(x = "Especies", y = "Índice de diversidad de Shannon")+
+  scale_fill_discrete(name = "Especies") +
+  scale_fill_discrete(name = "Especies", 
+                      labels = c("CF","CPF","CPP","CAS", "CAA", "CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF",
+                            "3CPP" = "CPP", "4CAS" = "CAS",
+                            "5CAA" = "CAA", "6CM" = "CM"))
+
+pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
+
+
+                         ##### BETA DIVERSITY #####
+library(vegan)
+# Transform data to relative abundance
+ps.rarefied
+its2_5_re <- microbiome::transform(ps.rarefied, "compositional")
+
+
+# unweighted UniFrac distance matrix
+unwunifrac_dist_16s = phyloseq::distance(s16_6, method="uunifrac")
+as.matrix(unwunifrac_dist_16s)[1:6, 1:6]
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_16s = ordinate(s16_6, method="PCoA", "unifrac", weighted = F)
+
+baseplot_16s <- plot_ordination(s16_6, ordination_16s,
+                                color="especies",
+                                type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()
+baseplot_16s
+#
+baseplot_16s + geom_point(size = 2)
+#
+#baseplot1 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+baseplot_16s +
+  geom_point(size = 2)+
+  ggtitle("")+
+  facet_wrap(~sexo+tratamiento)
+
+# Weighted UniFrac distance matrix
+wunifrac_dist_16s = phyloseq::distance(s16_6, method="wunifrac")
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_2 = ordinate(s16_6, method="PCoA", distance=wunifrac_dist_16s)
+
+baseplot_16s_2 <- plot_ordination(s16_6, ordination_16s_2,
+                                  color="tratamiento",
+                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("Bacteria")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 3)+
+  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+  #scale_color_discrete(name = "Condition", 
+  #                    labels = c("Domesticated","Wild"))+
+  scale_color_discrete(name = "Treatment",
+                       labels = c("No-visited","Visited"))
+
+baseplot_16s_2
+#
+baseplot_16s_2 + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+baseplot_16s_2 +
+  geom_point(size = 2)+
+  ggtitle("")+
+  facet_wrap(~tratamiento,2)
+
+
+# por condicion
+# Weighted UniFrac distance matrix
+wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
+
+baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
+                                  color="condicion",
+                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("Bacteria")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 3)+
+  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+  scale_color_discrete(name = "Condition", 
+                       labels = c("Domesticated","Wild"))
+#scale_color_discrete(name = "Treatment",
+#                    labels = c("No-visited","Visited"))
+
+baseplot_16s_2
+#
+baseplot_16s_2 + stat_ellipse()
+
+
+# por sexo
+# Weighted UniFrac distance matrix
+wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
+
+baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
+                                  color="sexo",
+                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("Bacteria")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 3)+
+  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+  scale_color_discrete(name = "Floral sex", 
+                       labels = c("Female","Male"))
+#scale_color_discrete(name = "Treatment",
+#                    labels = c("No-visited","Visited"))
+
+baseplot_16s_2
+#
+baseplot_16s_2 + stat_ellipse()
+
+
+baseplot_16s_2
+baseplot_its_2
+# Juntando gráficas
+gt <- grid.arrange(baseplot_its_2_fungi, baseplot_16s_2, 
+                   ncol = 1, nrow = 2)
+
+
+baseplot_its_2_fungi
+baseplot_16s_2
+
+
+
+ordu.unwt.uni <- ordinate(s16_6_re, "PCoA", "unifrac", weighted=F)
 
 
 
 
+                         #### PERMANOVA ####
+s16_6_rel <- microbiome::transform(s16_6, "compositional")
+metadf = data.frame(sample_data(s16_6))
+# calculating Weighted-UniFrac
+wunifrac.dist <- UniFrac(s16_6_rel, 
+                        weighted = TRUE, 
+                        normalized = TRUE,  
+                        parallel = FALSE, 
+                        fast = TRUE)
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm1 = adonis2(wunifrac.dist ~ especies*sexo*tratamiento, data = metadf,
+                by = "terms", permutations = 999)
+perm1        
 
+# calculating Unweighted-UniFrac
+unifrac.dist <- UniFrac(s16_6_rel, 
+                        weighted = FALSE, 
+                        normalized = TRUE,  
+                        parallel = FALSE, 
+                        fast = TRUE)
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm2 = adonis2(unifrac.dist ~ especies*sexo*tratamiento, data = metadf,
+                by = "terms", permutations = 999)
+perm2  
 
-
+?betadisper
+ps.disper <- betadisper(unifrac.dist, metadf$especies)
+permutest(ps.disper, pairwise = TRUE)
+anova(ps.disper)
+TukeyHSD(ps.disper)
 
 
 #### ANALYSIS WITH RAREFIED DATA ####
@@ -485,449 +720,16 @@ hist(tab$rare_abundance)
 tab$low_abundance
 
 
-######## analisis estadistica de diversidad alfa
-kruskal.test(div.df$observed~div.df$especies)
-pairwise.wilcox.test(div.df$observed, div.df$especies, exact=F)
 
-kruskal.test(div.df$observed~div.df$sexo)
-pairwise.wilcox.test(div.df$observed, div.df$sexo, exact=F)
 
-kruskal.test(div.df$observed~div.df$tratamiento)
-pairwise.wilcox.test(div.df$observed, div.df$tratamiento, exact=F)
 
 
 
-kruskal.test(div.df$observed~div.df$especies+div.df$sexo)
-pairwise.wilcox.test(div.df$observed, div.df$especies, exact=F)
 
-pairwise.wilcox.test(tab$observed, sample_data(ps.rarefied100)$especies)
 
-pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$condicion)
-pairwise.wilcox.test(tab$observed, sample_data(pseq)$especie)
 
-pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$especie)
 
-
-# análisis estadístico del tamaño del polen con una prueba de kruskal-wallis
-kruskal.test(ps1.meta$Shannon ~ sample_data(ps1.meta)$especies)
-# comparaciones multiples
-pairwise.wilcox.test(ps1.meta$Shannon, sample_data(ps1.meta)$especies)
-
-
-pairwise.wilcox.test(tab$observed, sample_data(pseq)$sexo)
-pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$sexo)
-pairwise.wilcox.test(tab$observed, sample_data(pseq)$tratamiento)
-pairwise.wilcox.test(tab$diversity_shannon, sample_data(pseq)$tratamiento)
-
-
-
-# VISUALIZATION de diversidad alfa
-### stripchart de Observed ASVs
-ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
-  #geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "ASV observados")+
-  scale_color_discrete(name = "Especies", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_bw()+
-  facet_wrap(~sexo+tratamiento)
-  #stat_summary(fun=mean, geom="point", shape=18,
-  #            size=6, color="red")
-
-### stripchart Shannon diversity index by species
-ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+ 
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "Alpha diversity (Shannon)",
-       title = "")+
-  scale_color_discrete(name = "Especies", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_bw()+
-  #stat_summary(fun=mean, geom="point", shape=18,
-  #            size=6, color="red")
-  # shannon_16s_1 = shannon_16s_1 + 
-  #stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
-shannon_16s_1
-
-# cargando paqueteria gridExtra
-library(gridExtra)
-library(cowplot)
-gt <- grid.arrange(shannon_hongos2,shannon_16s, 
-                   ncol = 2, nrow = 1)
-
-
-gt <- grid.arrange(shannon_hongos2, shannon_16s, 
-                   ncol = 2, nrow = 1)
-
-
-gt3 <- grid.arrange(shannon_hongos2, shannon_hongos4, shannon_hongos3,
-                    ncol = 1, nrow = 3)
-
-
-#### Shannon por sexo ####
-ggplot(div.df, aes(x=sexo, y=diversity_shannon,
-                                     color=sexo)) + 
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
-  scale_shape_manual(values=c(1,19))
-  labs(x="Sex", y = "Alpha diversity (Shannon)",
-       title = "")+
-  scale_color_discrete(name = "Especies", 
-                       labels = c("3CPP"="CPP", "4CAS" = "CAS", "5CAA"="CAA",
-                                  "6CM"="CM"))+
-  scale_x_discrete(labels=c("3CPP"="CPP", "4CAS" = "CAS", "5CAA"="CAA",
-                            "6CM"="CM"))+
-  theme_bw()+
-  scale_y_continuous(limits=c(0, 3))+
-  scale_x_discrete(labels = c("Female","Male"))+
-  theme(legend.position = "none")
-
-shannon_16s_3 = shannon_16s_3 + stat_compare_means(method = "wilcox.test", 
-                                                   label.x = 1.5, label.y = 3)
-
-shannon_16s_3
-
-# cargando paqueteria gridExtra
-gt4 <- grid.arrange(shannon_16s_1, shannon_16s_3, shannon_16s_2, 
-                    ncol = 1, nrow = 3)
-
-#### shannon por especie ####
-# primero haces el análisis
-compare_means(Shannon ~ especies,  data = ps1.meta)
-# Visualize: Specify the comparisons you want
-#my_comparisons <- list( c("5CAA", "3CPP"), c("5CAA", "4CAS"), c("5CAA", "6CM"),
-#                        c("3CPP", "4CAS"), c("3CPP", "6CM"), c("4CAS", "6CM"))
-my_comparisons <- list( c("5CAA", "4CAS"), c("5CAA", "6CM"),
-                        c("3CPP", "6CM"))
-
-shannon_16s_3 = ggplot(ps1.meta, aes(x=especies, y=Shannon,
-                                     color=especies)) + 
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "Índice de diversidad de Shannon",
-       title = "Bacterias")+
-  scale_color_discrete(name = "Especies", 
-                       labels = c("3CPP"="CPP", "4CAS" = "CAS", "5CAA"="CAA",
-                                  "6CM"="CM"))+
-  scale_x_discrete(labels=c("3CPP"="CPP", "4CAS" = "CAS", "5CAA"="CAA",
-                            "6CM"="CM"))+
-  theme_bw()+
-  #scale_y_continuous(limits=c(0, 3))+
-  theme(legend.position = "none")+
-  ## Add pairwise comparisons p-value
-  stat_compare_means(comparisons = my_comparisons) +
-  stat_compare_means(label.x = .7 , label.y = 4.5)    # Add global p-value
-shannon_16s_3
-
-shannon_16s_3 = shannon_16s_3 + stat_compare_means(method = "wilcox.test", 
-                                                   label.x = 1.5, label.y = 3)
-
-shannon_hongos3
-shannon_16s_2
-
-# cargando paqueteria gridExtra
-gt2 <- grid.arrange(shannon_hongos3, shannon_16s_2, 
-                    ncol = 2, nrow = 1)
-
-
-# graficas por sexo
-shannon_hongos4
-shannon_16s_4
-# cargando paqueteria gridExtra
-gt3 <- grid.arrange(shannon_hongos4, shannon_16s_4, 
-                    ncol = 2, nrow = 1)
-
-
-# otra gráfica
-p.shannon <- boxplot_alpha(pseq, 
-                           index = "shannon",
-                           x_var = "especie",
-                           fill.colors = c("1CF" = "yellow",
-                                           "2CPF" = "blue",
-                                           "3CPP"="green",
-                                           "4CAS"="cyan4",
-                                           "5CAA"="deeppink4",
-                                           "6CM"="red"
-                           ))
-p.shannon
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x="Especies", y="Indice de diversidad de Shannon") +
-  theme(axis.text = element_text(size=12),
-        axis.title = element_text(size=16),
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=16))
-p.shannon
-
-
-# create a list of pairwise comparisons
-spp <- base::levels(as.factor(ps1.meta$especie)) # get the variables
-# make a pairwise list that we want to compare.
-spp.pairs <- combn(seq_along(spp), 2, simplify = FALSE, FUN = function(i)spp[i])
-print(spp.pairs)
-
-#
-library(ggpubr)
-# gráfica del indice de diversida de Shannon por especie
-#p1 <- ggboxplot(ps1.meta, x = "especie", y = "Shannon",
-#                add = c("boxplot", "jitter"), fill = "especie")+
-# labs(x = "Especies", y = "Índice de diversidad de Shannon")
-#  scale_fill_discrete(name = "Especies", 
-#                    labels = c("CF","CPF","CPP","CAS", "CAA", "CM"))+
-#  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF",
-#                            "3CPP" = "CPP", "4CAS" = "CAS",
-#                            "5CAA" = "CAA", "6CM" = "CM"))
-#print(p1)
-#p1 <- p1 + stat_compare_means(comparisons = spp.pairs) 
-#print(p1) # Wilcox test
-
-# Gráfica del número de taxones observados por especie
-# p2 <- ggboxplot(ps1.meta, x = "especie", y = "observed",alpha =.5,
-#                add = c("boxplot","jitter"), fill = "especie")+
-#  labs(x = "Especies", y = "Riqueza observada")+
-#  scale_fill_discrete(name = "Especies", 
-#                      labels = c("CAS","CAA", "CM", "CPP"))+
-#  scale_x_discrete(labels=c("1CAS" = "CAS", "2CAA" = "CAA",
-#                            "3CM" = "CM", "4CPP" = "CPP"))
-# print(p2)
-# p2 <- p2 + stat_compare_means(comparisons = spp.pairs) 
-# print(p2) # Wilcox test
-
-
-### gráfica del indice de Shannon entre especies
-pmult <- ggboxplot(ps1.meta, x = "especie", y = "Shannon", alpha = .5,
-                   fill = "especie", add = "jitter")+ 
-  labs(x = "Especies", y = "Índice de diversidad de Shannon")+
-  scale_fill_discrete(name = "Especies", 
-                      labels = c("CPP","CAS", "CAA", "CM"))+
-  scale_x_discrete(labels=c("2CAA" = "CAA", "4CPP" = "CPP",
-                            "1CAS" = "CAS", "3CM" = "CM" ))
-pmult
-ggpar(pmult, ylim = c(0,3))
-
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-### gráfica del indice de Shannon entre especies y sexo
-pmult <- ggboxplot(div.df, x = "especies", y = "observed", alpha = .5,
-                   fill = "especies", add = "jitter", facet.by = "sexo",
-                   panel.labs = list(sexo = c("female",
-                                                     "male")),
-                   short.panel.labs = FALSE)
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-  
-  labs(x = "Especies", y = "Índice de diversidad de Shannon")+
-  scale_fill_discrete(name = "Especies") +
-  scale_fill_discrete(name = "Especies", 
-                      labels = c("CF","CPF","CPP","CAS", "CAA", "CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF",
-                            "3CPP" = "CPP", "4CAS" = "CAS",
-                            "5CAA" = "CAA", "6CM" = "CM"))
-
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-### gráfica del número de taxones observados entre especies y tratamientos
-pmult <- ggboxplot(ps1.meta, x = "especie", y = "observed", alpha = .5,
-                   fill = "especie", add = "jitter", facet.by = "tratamiento",
-                   panel.labs = list(tratamiento = c("t1", "t2")),
-                   short.panel.labs = FALSE)+ 
-  labs(x = "Especies", y = "Riqueza observada")+
-  scale_fill_discrete(name = "Especies")
-
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-
-##### gráfica del indice de Shannon por especie y sexo 
-pmult <- ggboxplot(ps1.meta2, x = "especie", y = "Shannon", alpha = .5,
-                   fill = "especie", add = "jitter", 
-                   facet.by = "sexo",
-                   panel.labs = list(sexo = c("Hembra",
-                                              "Macho")),
-                   short.panel.labs = FALSE)+ 
-  labs(x = "Especies", y = "Indice de diversidad de Shannon")+
-  scale_fill_discrete(name = "Especies",
-                      labels = c("CPP","CAS", "CAA", "CM"))+
-  scale_x_discrete(labels=c("1CAS" = "CAS", "2CAA" = "CAA",
-                            "3CM" = "CM", "4CPP" = "CPP"))+
-  theme(legend.position = "top")
-
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-##### número de otus observados por especie, sexo y tratamiento
-pmult <- ggboxplot(ps1.meta, x = "especie", y = "observed", alpha = .5,
-                   color = "sexo", fill = "especie", add = "jitter", 
-                   facet.by = "tratamiento",
-                   panel.labs = list(tratamiento = c("Sin visita",
-                                                     "Con visita")),
-                   short.panel.labs = FALSE)+ 
-  labs(x = "Especies", y = "Riqueza observada")+
-  scale_fill_discrete(name = "Especies",
-                      labels = c("CAS","CAA", "CM", "CPP"))+
-  scale_x_discrete(labels=c("1CAS" = "CAS", "2CAA" = "CAA",
-                            "3CM" = "CM", "4CPP" = "CPP"))+
-  theme(legend.position = "bottom")
-
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-
-
-
-
-
-                        ##### BETA DIVERSITY #####
-# unweighted UniFrac distance matrix
-unwunifrac_dist_16s = phyloseq::distance(pseq_16s, method="uunifrac")
-as.matrix(unwunifrac_dist_16s)[1:6, 1:6]
-
-# PCoA plot using the unweighted UniFrac as distance
-ordination_16s = ordinate(pseq_16s, method="PCoA", distance=unwunifrac_dist_16s)
-
-baseplot_16s <- plot_ordination(pseq_16s, ordination_16s,
-                                color="especies",
-                                type = "samples",
-) + #shape = "sexo"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()
-baseplot_16s
-#
-baseplot_16s + geom_point(size = 2)
-#
-#baseplot1 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-baseplot_16s +
-  geom_point(size = 2)+
-  ggtitle("")+
-  facet_wrap(~tratamiento,2)
-
-# Weighted UniFrac distance matrix
-wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
-
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
-                                  color="tratamiento",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 3)+
-  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-  #scale_color_discrete(name = "Condition", 
-  #                    labels = c("Domesticated","Wild"))+
-  scale_color_discrete(name = "Treatment",
-                       labels = c("No-visited","Visited"))
-
-baseplot_16s_2
-#
-baseplot_16s_2 + stat_ellipse()
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-baseplot_16s_2 +
-  geom_point(size = 2)+
-  ggtitle("")+
-  facet_wrap(~tratamiento,2)
-
-
-# por condicion
-# Weighted UniFrac distance matrix
-wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
-
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
-                                  color="condicion",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 3)+
-  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-  scale_color_discrete(name = "Condition", 
-                       labels = c("Domesticated","Wild"))
-#scale_color_discrete(name = "Treatment",
-#                    labels = c("No-visited","Visited"))
-
-baseplot_16s_2
-#
-baseplot_16s_2 + stat_ellipse()
-
-
-# por sexo
-# Weighted UniFrac distance matrix
-wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
-
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
-                                  color="sexo",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 3)+
-  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-  scale_color_discrete(name = "Floral sex", 
-                       labels = c("Female","Male"))
-#scale_color_discrete(name = "Treatment",
-#                    labels = c("No-visited","Visited"))
-
-baseplot_16s_2
-#
-baseplot_16s_2 + stat_ellipse()
-
-
-baseplot_16s_2
-baseplot_its_2
-# Juntando gráficas
-gt <- grid.arrange(baseplot_its_2_fungi, baseplot_16s_2, 
-                   ncol = 1, nrow = 2)
-
-
-baseplot_its_2_fungi
-baseplot_16s_2
-
-# PERMANOVA
-adonis2(unwunifrac_dist_16s ~ sample_data(pseq_16s)$especies*sample_data(pseq_16s)$sexo*
-          sample_data(pseq_16s)$tratamiento, permutations = 100)
-
-adonis2(wunifrac_dist_16s ~ sample_data(pseq_16s)$especies*sample_data(pseq_16s)$sexo*
-          sample_data(pseq_16s)$tratamiento, permutations = 100)
-
-# Metadata and estimate Unifrac
-metadata <- as(sample_data(pseq_16s), "data.frame")
-unifrac_dist_16s <- UniFrac(pseq_16s, weighted = TRUE)
-
-set.seed(100)  # Set the seed to make the analysis reproducible
-
-permanova_16s <- adonis2(unifrac_dist_16s ~ especies*sexo*tratamiento,
-                         data = metadata,
-                         permutations = 999)
-permanova_16s
-# por condicion
-permanova_16s_2 <- adonis2(unifrac_dist_16s ~ condicion*sexo*tratamiento,
-                           data = metadata,
-                           permutations = 999)
-
-permanova_16s_2
-
+                        
 ###############################################################################
 library(ggalluvial)
 library(pals)

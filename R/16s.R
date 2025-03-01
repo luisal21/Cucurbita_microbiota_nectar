@@ -433,19 +433,11 @@ pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
 
                          ##### BETA DIVERSITY #####
 library(vegan)
-# Transform data to relative abundance
-ps.rarefied
-its2_5_re <- microbiome::transform(ps.rarefied, "compositional")
-
-
-# unweighted UniFrac distance matrix
-unwunifrac_dist_16s = phyloseq::distance(s16_6, method="uunifrac")
-as.matrix(unwunifrac_dist_16s)[1:6, 1:6]
-
 # PCoA plot using the unweighted UniFrac as distance
-ordination_16s = ordinate(s16_6, method="PCoA", "unifrac", weighted = F)
+ordination_16s = ordinate(ps.rarefied50, method="PCoA", "unifrac",
+                          weighted = F)
 
-baseplot_16s <- plot_ordination(s16_6, ordination_16s,
+baseplot_16s <- plot_ordination(ps.rarefied50, ordination_16s,
                                 color="especies",
                                 type = "samples",
 ) + #shape = "sexo"
@@ -465,18 +457,22 @@ baseplot_16s +
   ggtitle("")+
   facet_wrap(~sexo+tratamiento)
 
-# Weighted UniFrac distance matrix
-wunifrac_dist_16s = phyloseq::distance(s16_6, method="wunifrac")
+#### Weighted UniFrac ####
+# Transform data to relative abundance
+ps.rarefied50
+s16_re = microbiome::transform(ps.rarefied50, "compositional")
 # PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(s16_6, method="PCoA", distance=wunifrac_dist_16s)
-
-baseplot_16s_2 <- plot_ordination(s16_6, ordination_16s_2,
-                                  color="tratamiento",
+ordination_16s_2 = ordinate(s16_re, method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_2 <- plot_ordination(s16_re, ordination_16s_2,
+                                  color="especies",
                                   type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("Bacteria")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 3)+
+  geom_point(size = 3)
+
+
   labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
   #scale_color_discrete(name = "Condition", 
   #                    labels = c("Domesticated","Wild"))+

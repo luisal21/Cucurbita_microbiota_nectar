@@ -88,7 +88,7 @@ s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
 # pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
 # muestras que quedaron con 0 secuencias:
 s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
-
+s16_5
 # A useful next step is to explore feature prevalence in the dataset,
 # which we will define here as the number of samples in which a taxa appears
 # at least once.
@@ -116,6 +116,7 @@ s16_6 # Final ASV data set: 3116 ASVs
 
 # Primero resumimos el contenido del objeto phyloseq
 summarize_phyloseq(s16_6) # reads totales 155,244
+sort(sample_sums(s16_6))
 
 # información del número de reads
 summary(sample_sums(s16_6))
@@ -135,6 +136,15 @@ plot_bar(s16_6, fill = "Phylum")+
 s16_6_re = transform_sample_counts(s16_6, function(x) x / sum(x))
 plot_bar(s16_6_re, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+
+# checking correlation between reads and ASVs observados
+ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
+                         "observed" = phyloseq::estimate_richness(s16_6,
+                                      measures = "Observed")[, 1]),
+       aes(x = total_reads, y = observed)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE) +
+  labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 
                     #### METODOS DE NORMALIZACION ####
@@ -173,15 +183,17 @@ abundances(ps.rarefied100)
 ### Normalize library size to 50 reads
 set.seed(111)
 ps.rarefied50 <- rarefy_even_depth(s16_6, 
-                             50, rngseed = 1,
+                             sample.size =50, rngseed = 1,
                              replace = FALSE)             
 ps.rarefied50 # use this rarefied depth
 # phyloseq object with normalized library size has
 # 785 ASVs in 168 samples
 # 757 asvs in 168 samples 26/02/2025
+# 784 ASVs in 168 samples 03/03/2025
 reads_sample2 = readcount(ps.rarefied50)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied50)
+# total number of reads= 8400 in rarefied data
 summary(sample_sums(ps.rarefied50))
 abundances(ps.rarefied50)
 
@@ -325,10 +337,10 @@ p.shannon
 # Stripchart of observed ASVs with 1 panel
 ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "ASV observados")+
-  scale_color_discrete(name = "Especies", 
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -340,10 +352,10 @@ ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
 ### stripchart de Observed ASVs facet with 4 panels
 ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "ASV observados")+
-  scale_color_discrete(name = "Especies", 
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -355,14 +367,14 @@ ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
 #stat_summary(fun=mean, geom="point", shape=18,
 #            size=6, color="red")
 
-### stripchart Shannon diversity index by species
+### stripchart Shannon diversity index facet with 4 panels
 ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+ 
   geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "Shannon",
+  labs(x="Species", y = "Shannon diversity index",
        title = "")+
-  scale_color_discrete(name = "Especies", 
+  scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -376,14 +388,14 @@ ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+
   # shannon_16s_1 = shannon_16s_1 + 
   #stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
 
-### stripchart phylogenetic diversity index
+### stripchart phylogenetic diversity index facet with 4 panels
 ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+ 
   geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 3)+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Especies", y = "PD",
+  labs(x="Species", y = "Phylogenetic Diversity index",
        title = "")+
-  scale_color_discrete(name = "Especies", 
+  scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -471,13 +483,11 @@ baseplot_16s_2 <- plot_ordination(s16_re, ordination_16s_2,
   theme(aspect.ratio=1)+
   theme_bw()+
   geom_point(size = 3)
-
-
-  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+  #labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
   #scale_color_discrete(name = "Condition", 
   #                    labels = c("Domesticated","Wild"))+
-  scale_color_discrete(name = "Treatment",
-                       labels = c("No-visited","Visited"))
+  #scale_color_discrete(name = "Treatment",
+  #                     labels = c("No-visited","Visited"))
 
 baseplot_16s_2
 #
@@ -555,9 +565,6 @@ baseplot_16s_2
 
 ordu.unwt.uni <- ordinate(s16_6_re, "PCoA", "unifrac", weighted=F)
 
-
-
-
                          #### PERMANOVA ####
 s16_6_rel <- microbiome::transform(s16_6, "compositional")
 metadf = data.frame(sample_data(s16_6))
@@ -591,27 +598,32 @@ permutest(ps.disper, pairwise = TRUE)
 anova(ps.disper)
 TukeyHSD(ps.disper)
 
-
 #### ANALYSIS WITH RAREFIED DATA ####
+### Calculating relative abundances
+mergedGP <- merge_samples(ps.rarefied50, "especies")
+# Use psmelt to obtain a long-format data.frame
+phy <- mergedGP %>% tax_glom(taxrank = "Family") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+View(phy)
+write.csv(phy, file = "abundancias.csv")
+
+#mergedtop = merge_samples(topfam, "especies")
+#phy2 <- mergedtop %>% tax_glom(taxrank = "Family") %>%
+#  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#View(phy2)
+
 #### HEATMAPs of most abundant bacteria ####
-
 ### Collapse dataset taxonomy to 10 most abundant families
+topfam <- aggregate_top_taxa2(ps.rarefied50, "Family", top = 10)
+#View(otu_table(topfam))
+topfam
 
-topfam <- aggregate_top_taxa2(ps.rarefied100, "Family", top = 10)
-View(otu_table(topfam))
 # transform families dataset to relative abundance
 transform <- microbiome::transform
 famrel <- transform(topfam, "compositional")
-View(otu_table(famrel))
+#View(otu_table(famrel))
 
-### Define colors for heatmap
-heat.cols <- c("#a8dadc","#457b9d", "#1d3557")
-### Create a gradient color palette for abundance
-grad_ab <- colorRampPalette(c("#96d4ca","#d3f3f1", "#7c65a9"))
-heat.cols <- grad_ab(10)
-
-### Heatmap for 10 most abundant bacterial families in king penguin body sites
-
+### Heatmap for 10 most abundant bacterial families between species
 heatmap_k <- simple_heatmap(famrel,
                             group.facet = "especies",
                             group.order = NULL,
@@ -620,13 +632,103 @@ heatmap_k <- simple_heatmap(famrel,
                             level = "Family",
                             scale.color = "log10",
                             na.fill = "white",
-                            color.fill = heat.cols,
+                            color.fill = NULL,
                             taxa.arrange=TRUE,
                             remove.other=TRUE,
                             panel.arrange="grid",
                             ncol=NULL,
                             nrow=NULL)
 heatmap_k
+
+
+# Separando por sexos florales
+hembras <- subset_samples(ps.rarefied50, sexo == "hembra")
+machos <- subset_samples(ps.rarefied50, sexo == "macho")
+
+# Flores hembra
+topfam_hem <- aggregate_top_taxa2(hembras, "Family", top = 10)
+# transform families dataset to relative abundance
+transform <- microbiome::transform
+famrel_hem <- transform(topfam_hem, "compositional")
+# Heatmap de flores hembra
+heatmap_hem <- simple_heatmap(famrel_hem,
+                            group.facet = "especies",
+                            group.order = NULL,
+                            abund.thres = 0.01,
+                            prev.thres = 0.01,
+                            level = "Family",
+                            scale.color = "log10",
+                            na.fill = "white",
+                            color.fill = NULL,
+                            taxa.arrange=TRUE,
+                            remove.other=TRUE,
+                            panel.arrange="grid",
+                            ncol=NULL,
+                            nrow=NULL)
+heatmap_hem
+
+# Flores machos
+topfam_mac <- aggregate_top_taxa2(machos, "Family", top = 10)
+# transform families dataset to relative abundance
+transform <- microbiome::transform
+famrel_mac <- transform(topfam_mac, "compositional")
+# Heatmap de flores hembra
+heatmap_mac <- simple_heatmap(famrel_mac,
+                              group.facet = "especies",
+                              group.order = NULL,
+                              abund.thres = 0.01,
+                              prev.thres = 0.01,
+                              level = "Family",
+                              scale.color = "log10",
+                              na.fill = "white",
+                              color.fill = NULL,
+                              taxa.arrange=TRUE,
+                              remove.other=TRUE,
+                              panel.arrange="grid",
+                              ncol=NULL,
+                              nrow=NULL)
+heatmap_mac
+
+### Arrange heatmaps in one graphic
+library(ggpubr)
+library(gridExtra)
+heatmaps <- grid.arrange(heatmap_hem, heatmap_mac, nrow = 2)
+
+### Save heatmaps
+
+ggsave("heatmaps_june.pdf", 
+       plot = heatmaps,
+       width = 20, 
+       height = 20, 
+       units = "cm")
+
+#### CORE MICROBIOTA ####
+prevdf = apply(X = otu_table(s16_6),
+               MARGIN = ifelse(taxa_are_rows(s16_6), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+# Add taxonomy and total read counts to this data.frame
+prevdf = data.frame(Prevalence = prevdf,
+                    TotalAbundance = taxa_sums(s16_6),
+                    tax_table(s16_6))
+
+table(prevdf$Prevalence)
+ggplot(prevdf, aes(Prevalence)) + geom_histogram(bins = 50) + theme_bw() + 
+  ggtitle("Histogram of Taxa Prevalence")
+
+View(head(otu_table(s16_6)))
+head(prevdf)
+
+ps.rel = microbiome::transform(ps.rarefied50, "compositional")
+# Core tresholds: minimum ASV relative abundance 0.001 % minimum prevalence
+# among samples 90%
+
+core.taxa = core_members(ps.rel, detection = 0.001, prevalence = .1,
+                         include.lowest = T)
+print(core.taxa)
+
+full_core <- core(ps.rarefied50, detection = 0.001, prevalence = .1)
+View(tax_table(full_core))
 
 #### TOP FIVE FAMILIES ####
 library(microbiomeutilities)
@@ -641,7 +743,7 @@ pn <- plot_taxa_boxplot(ps.rarefied50,
                         title = "Top five families", 
                         keep.other = FALSE,
                         #group.order = c("back","chest","foot"),
-                        group.colors = kcols,
+                        #group.colors = kcols,
                         dot.size = 1)
 
 print(pn + theme_biome_utils())

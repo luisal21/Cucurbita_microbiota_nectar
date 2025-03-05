@@ -840,7 +840,7 @@ compa1 = emmeans(mod1,
 #write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
 
 # Shannon
-mod2 = glm(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
+mod2 = glm(diversity_shannon ~ especies*sexo*tratamiento, data = div.df2)
 summary(mod2)
 anova(mod2)
 # post-hoc comparisons
@@ -851,7 +851,7 @@ compa2 = emmeans(mod2,
 #summary(modx)
 
 # Phylogenetic Diversity index
-mod3 = glm(Phylogenetic_Diversity ~ especies*sexo*tratamiento, data = div.df)
+mod3 = glm(Phylogenetic_Diversity ~ especies*sexo*tratamiento, data = div.df2)
 summary(mod3)
 anova(mod3)
 # post-hoc comparisons

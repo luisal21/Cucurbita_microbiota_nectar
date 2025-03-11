@@ -880,6 +880,24 @@ View(uppen)
 # función para gráficar los ASVs compartidos entre especies
 ?upset
 
+upset(uppen, nsets = 6, mainbar.y.label = "Number of ASVs shared",
+      order.by = "freq",
+      queries = list(list(query = intersects,
+                         params = list("6CM", "5CAA", "4CPP"),
+                          color = "orange",
+                         active = T),
+                     list(query = intersects,
+                          params = list("6CM", "5CAA", "4CPP", 
+                                        "3CAS", "2CPF", "1CF"),
+                          color = "green",
+                          active = T)))
+                     #list(query = intersects,
+                      #    params = list("3CAS", "2CPF", "1CF"),
+                       #   color = "pink",
+                        #  active = T)))
+
+
+
 
 
 ###############################################################################

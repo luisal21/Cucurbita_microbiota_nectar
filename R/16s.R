@@ -497,7 +497,7 @@ gt2 <- grid.arrange(riqueza_16_group, shannon_16_group, pd_16_group,
                    ncol = 1, nrow = 3)
 
 
-                         ##### BETA DIVERSITY #####
+            ########## BETA DIVERSITY  WITH RAREFIED DATA ##########
 library(vegan)
 #### Unweighted UniFrac ####
 # PCoA plot using the unweighted UniFrac as distance
@@ -895,10 +895,9 @@ upset(uppen, nsets = 6, mainbar.y.label = "Number of ASVs shared",
                       #    params = list("3CAS", "2CPF", "1CF"),
                        #   color = "pink",
                         #  active = T)))
-
-
-
-
+                        #text.scale = 1.1, 
+                        #point.size = 2.8, 
+                        #line.size = 1
 
 ###############################################################################
 ###############################################################################
@@ -948,7 +947,7 @@ df.pd2 <- pd(t(ps0.rar.asvtab2), ps0.rar.tree2,include.root=T)
 # t(ou_table) transposes the table for use in picante and the tre file comes
 # from the first code chunck we used to read tree file (see making a phyloseq 
 # object section).
-datatable(df.pd2)
+#datatable(df.pd2)
 
 # We add the results of PD to this file and then plot
 div.df2$Phylogenetic_Diversity <- df.pd2$PD
@@ -956,82 +955,58 @@ head(div.df2)
 
 
 # data
-div.df2$diversity_shannon
 div.df2$observed
+div.df2$diversity_shannon
 div.df2$Phylogenetic_Diversity
 # Histograma
-hist(div.df2$diversity_shannon) 
 hist(div.df2$observed)
+hist(div.df2$diversity_shannon) 
 hist(div.df2$Phylogenetic_Diversity)
 # Shapiro test
-shapiro.test(div.df2$diversity_shannon)
 shapiro.test(div.df2$observed)
+shapiro.test(div.df2$diversity_shannon)
 shapiro.test(div.df2$Phylogenetic_Diversity)
 
 
 ### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
 library(emmeans)
 # Richness
-mod1 = glm(observed ~ especies*sexo*tratamiento, data = div.df2,
+mod4 = glm(observed ~ especies*sexo, data = div.df2,
            family = poisson)
-summary(mod1)
-anova(mod1)
+summary(mod4)
+anova(mod4)
 # post-hoc comparisons
-compa1 = emmeans(mod1, 
-                 specs = pairwise ~ especies | sexo | tratamiento, 
+compa4 = emmeans(mod4, 
+                 specs = pairwise ~ especies | sexo, 
                  type = "response")
+compa4
 #write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
 
 # Shannon
-mod2 = glm(diversity_shannon ~ especies*sexo*tratamiento, data = div.df2)
-summary(mod2)
-anova(mod2)
+mod5 = glm(diversity_shannon ~ especies*sexo, data = div.df2)
+summary(mod5)
+anova(mod5)
 # post-hoc comparisons
-compa2 = emmeans(mod2, 
-                 specs = pairwise ~ especies | sexo | tratamiento, 
+compa5 = emmeans(mod5, 
+                 specs = pairwise ~ especies | sexo, 
                  type = "response")
+compa5
 #modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
 #summary(modx)
 
 # Phylogenetic Diversity index
-mod3 = glm(Phylogenetic_Diversity ~ especies*sexo*tratamiento, data = div.df2)
-summary(mod3)
-anova(mod3)
+mod6 = glm(Phylogenetic_Diversity ~ especies*sexo, data = div.df2)
+summary(mod6)
+anova(mod6)
 # post-hoc comparisons
 compa3 = emmeans(mod3, 
                  specs = pairwise ~ especies | sexo | tratamiento, 
                  type = "response")
 
-######## Analysis with kruskal-Wallis and Wilcox text
-# by species
-kruskal.test(div.df$observed~div.df$especies)
-pairwise.wilcox.test(div.df$observed, div.df$especies, exact=F)
-# by sex
-kruskal.test(div.df$observed~div.df$sexo)
-pairwise.wilcox.test(div.df$observed, div.df$sexo, exact=F)
-# by treatment
-kruskal.test(div.df$observed~div.df$tratamiento)
-pairwise.wilcox.test(div.df$observed, div.df$tratamiento, exact=F)
-
 
 ##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data####
-# Now use this data frame to plot 
-p.shannon <- boxplot_alpha(ps.rarefied50, 
-                           index = "shannon",
-                           x_var = "especies")
-p.shannon
-#fill.colors = c(female="cyan4", male="deeppink4"))
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x="Species", y="Shannon diversity") +
-  theme(axis.text = element_text(size=12),
-        axis.title = element_text(size=16),
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=16))
-p.shannon
-
 # Stripchart of observed ASVs with 1 panel
-ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
+ggplot(div.df2, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
@@ -1045,8 +1020,8 @@ ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   #                                                       "Visitadas")) +
   theme_bw()
 
-### stripchart de Observed ASVs facet with 4 panels
-ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
+### stripchart de Observed ASVs facet with 2 panels
+pro16_1 = ggplot(div.df2, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 1)+
   scale_shape_manual(values=c(1,19))+
@@ -1059,12 +1034,12 @@ ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
   #                                                       "Visitadas")) +
   theme_bw()+
-  facet_wrap(~sexo+tratamiento)
+  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
 #stat_summary(fun=mean, geom="point", shape=18,
 #            size=6, color="red")
 
 ### stripchart Shannon diversity index facet with 4 panels
-ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+ 
+pro16_2 = ggplot(div.df2, aes(x=especies, y=diversity_shannon, color=especies))+ 
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
@@ -1078,14 +1053,14 @@ ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
   #                                                       "Visitadas")) +
   theme_bw()+
-  facet_wrap(~sexo+tratamiento)
+  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
 #stat_summary(fun=mean, geom="point", shape=18,
 #            size=6, color="red")
 # shannon_16s_1 = shannon_16s_1 + 
 #stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
 
-### stripchart phylogenetic diversity index facet with 4 panels
-ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+ 
+### stripchart phylogenetic diversity index facet with 2 panels
+pro16_3 = ggplot(div.df2, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+ 
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
@@ -1099,7 +1074,7 @@ ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
   #                                                       "Visitadas")) +
   theme_bw()+
-  facet_wrap(~sexo+tratamiento)
+  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
 #stat_summary(fun=mean, geom="point", shape=18,
 #            size=6, color="red")
 # shannon_16s_1 = shannon_16s_1 + 
@@ -1108,16 +1083,10 @@ ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+
 # cargando paqueteria gridExtra
 library(gridExtra)
 library(cowplot)
-gt <- grid.arrange(shannon_hongos2,shannon_16s, 
-                   ncol = 2, nrow = 1)
+gt_pro <- grid.arrange(pro16_1, pro16_2, pro16_3, 
+                   ncol = 1, nrow = 3)
 
 
-gt <- grid.arrange(shannon_hongos2, shannon_16s, 
-                   ncol = 2, nrow = 1)
-
-
-gt3 <- grid.arrange(shannon_hongos2, shannon_hongos4, shannon_hongos3,
-                    ncol = 1, nrow = 3)
 
 head(div.df)
 ### gráfica del indice de Shannon entre especies y sexo

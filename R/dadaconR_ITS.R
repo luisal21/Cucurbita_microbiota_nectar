@@ -468,7 +468,7 @@ plyr::ddply(prevdf_its, "Phylum", function(df1)
 {cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
 
 # Filtering phyla whose prevalence is 0
-filterPhyla_its = c("p__Chytridiomycota", " p__Mortierellomycota",
+filterPhyla_its = c("p__Chytridiomycota", "p__Mortierellomycota",
                     "p__Mucoromycota")
 # Filter entries with low prevalence Phylum.
 its6 = subset_taxa(its5, !Phylum %in% filterPhyla_its)
@@ -488,6 +488,14 @@ reads_sample = readcount(its6)
 reads_sample[1:5]
 write.csv(reads_sample, file = "reads_sample_its_todas.csv")
 
+# Get count of phyla
+table(phyloseq::tax_table(its6)[,"Phylum"])
+# Convert to relative abundance
+ps_rel_abund = phyloseq::transform_sample_counts(its6, function(x)
+  {x / sum(x)})
+phyloseq::otu_table(its6)[1:5, 1:5]
+phyloseq::otu_table(ps_rel_abund)[1:5, 1:5]
+
 #### grafica de abundancia con phyloseq
 # creamos una primera visualización de la abundancia total de secuencias por
 # muestra a nivel de Phylum
@@ -498,14 +506,11 @@ plot_bar(its6, fill = "Phylum") +
 plot_bar(its6, fill = "Class") +
   geom_bar(aes(color = Class), stat = "identity",
            position = "stack")
-# Sacamos la abundacia relativa
-ps_re  = transform_sample_counts(its6, function(x) x / sum(x) )
-ps_re
 # Abundancia relativa a nivel de Phylum
-plot_bar(ps_re, fill = "Phylum") +
+plot_bar(ps_rel_abund, fill = "Phylum") +
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 # Abundancia relativa a nivel de Class
-plot_bar(ps_re, fill = "Class") +
+plot_bar(ps_rel_abund, fill = "Class") +
   geom_bar(aes(color = Class), stat = "identity", position = "stack")
 
 # Elimando NAs a nivel de phylum
@@ -539,89 +544,274 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 
-
-
-
-
-##### Curvas de Rarefacción ####
+#### METODOS DE NORMALIZACION ####
+#### RAREFIED DATA ####
 # Curvas de rarefacción
-otu_tab = t(abundances(its5))
-p = vegan::rarecurve(otu_tab,
+otu_tab_its = t(abundances(its6))
+p = vegan::rarecurve(otu_tab_its,
                      step = 50, label = FALSE,
-                     sample = min(rowSums(otu_tab),
+                     sample = min(rowSums(otu_tab_its),
                                   col = "blue, cex = 0.6"))
 
-rarecurve(t(otu_table(its5)), step=50, cex=0.5)
+### Normalize library size to 1000 reads
+set.seed(111)
+rare.its1000 <- rarefy_even_depth(its6, 
+                                     1000, rngseed = 1,
+                                     replace = FALSE)             
+rare.its1000
+# phyloseq object with normalized library size has
+# 17 ASVs in 4 samples
 
-its5
-# rarefy without replacement
-ps.rarefied = rarefy_even_depth(its5, rngseed=1, 
-                                sample.size=0.9*min(sample_sums(its5)),
-                                replace=F)
-ps.rarefied
-reads_sample2 = readcount(ps.rarefied)
-reads_sample2[1:5]
-#
-ps.rarefied = rarefy_even_depth(its5, rngseed=1, 
-                                sample.size=10,
-                                replace=F)
-# Elegi el submuestreo con un valor de 10 reads por muestra
-ps.rarefied
-summarize_phyloseq(ps.rarefied)
-summary(sample_sums(ps.rarefied))
-abundances(ps.rarefied)
+### Normalize library size to 100 reads
+set.seed(111)
+rare.its100 <- rarefy_even_depth(its6, 
+                                  100, rngseed = 1,
+                                  replace = FALSE)             
+rare.its100
+# phyloseq object with normalized library size has
+# 72 ASVs in 24 samples
 
-ps.rarefied
-plot_bar(ps.rarefied, fill = "Phylum")
-plot_bar(ps.rarefied, fill = "Order")
-plot_bar(ps.rarefied, fill = "Family")
+### Normalize library size to 50 reads
+set.seed(111)
+rare.its50 <- rarefy_even_depth(its6, 
+                                 50, rngseed = 1,
+                                 replace = FALSE)             
+rare.its50
+# phyloseq object with normalized library size has
+# 85 ASVs in 36 samples
 
-##### DESeq2 #### No correr por ahora
-# install package
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+### Normalize library size to 10 reads
+set.seed(111)
+rare.its10 <- rarefy_even_depth(its6, 
+                                10, rngseed = 1,
+                                replace = FALSE)             
+rare.its10
+# phyloseq object with normalized library size has
+# 109 ASVs in 100 samples
+reads_sampleits = readcount(rare.its10)
+reads_sampleits[1:20]
+summarize_phyloseq(rare.its10)
+# total number of reads= 1000 in rarefied data
+summary(sample_sums(rare.its10))
+abundances(rare.its10)
 
-BiocManager::install("DESeq2")
+### TAXA PREVALENCE
+plot_taxa_prevalence(its6, "Class")
+plot_taxa_prevalence(rare.its10, "Class")
 
-library(DESeq2)
+           #### ALPHA DIVERSITY WITHOUT RAREFIED DATA  ####
+library(knitr)
 
-kostic <- prune_samples(sample_sums(its5) > 10, its5)
-kostic
+div.its = microbiome::alpha(its6, index = c("observed", "shannon"))
+kable(head(div.its))
+View(div.its)
+str(div.its)
 
-sample_data(kostic)$condicion <- as.factor(sample_data(kostic)$condicion)
+# get the metadata out as separate object
+its.meta <- meta(its6)
+kable(head(its.meta))
+# Add the rownames as a new colum for easy integration later.
+its.meta$sam_name <- rownames(its.meta)
 
-# Convert to DESeq2 object
-DESeq2_Object <- phyloseq_to_deseq2(kostic, ~ condicion)
-#> converting counts to integer mode
-#> Warning in DESeqDataSet(se, design = design, ignoreRank): some variables in
-#> design formula are characters, converting to factors
+# Add the rownames to diversity table
+div.its$sam_name <- rownames(div.its)
 
-# calculate geometric means prior to estimate size factors
-gm_mean = function(x, na.rm=TRUE){
-  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
-}
-geoMeans = apply(counts(DESeq2_Object), 1, gm_mean)
-DESeq2_dds = estimateSizeFactors(DESeq2_Object, geoMeans = geoMeans)
-DESeq2_dds = DESeq(DESeq2_dds, fitType="local")
-#> using pre-existing size factors
-#> estimating dispersions
-#> gene-wise dispersion estimates
-#> mean-dispersion relationship
-#> final dispersion estimates
-#> fitting model and testing
+# merge these two data frames into one
+div.its.df <- merge(div.its,its.meta, by = "sam_name")
 
-# Explore results
-res = results(DESeq2_dds)
-res = res[order(res$padj, na.last=NA), ]
-alpha = 0.01
-sigtab = res[(res$padj < alpha), ]
-sigtab = cbind(as(sigtab, "data.frame"),
-               as(tax_table(kostic)[rownames(sigtab), ], "matrix"))
-head(sigtab)
+# check the tables
+colnames(div.its.df)
 
-posigtab = sigtab[sigtab[, "log2FoldChange"] > 0, ]
-posigtab = posigtab[, c("baseMean", "log2FoldChange", "lfcSE", "padj",
-                        "Phylum", "Class", "Family", "Genus")]
+### Phylogenetic diversity (Faith)
+library(picante)
+
+ps0.its.asvtab <- as.data.frame(its6@otu_table)
+
+ps0.its.tree <- its6@phy_tree
+
+# hmp.meta from previous code chunks
+
+# We first need to check if the tree is rooted or not 
+its6@phy_tree
+
+# it is a rooted tree
+its.pd <- pd(t(ps0.its.asvtab), ps0.its.tree,include.root=T) 
+# t(ou_table) transposes the table for use in picante and the tre file comes
+# from the first code chunck we used to read tree file (see making a phyloseq 
+# object section).
+# datatable(df.pd)
+
+# We add the results of PD to this file and then plot
+div.its.df$Phylogenetic_Diversity <- its.pd$PD
+head(div.its.df)
+
+
+# data
+div.its.df$observed
+div.its.df$diversity_shannon
+div.its.df$Phylogenetic_Diversity
+# Histograma
+hist(div.its.df$observed)
+hist(div.its.df$diversity_shannon) 
+hist(div.its.df$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(div.its.df$observed)
+shapiro.test(div.its.df$diversity_shannon)
+shapiro.test(div.its.df$Phylogenetic_Diversity)
+
+### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
+library(emmeans)
+# Richness
+mod7 = glm(observed ~ especie*sexo, data = div.its.df,
+           family = poisson)
+summary(mod7)
+anova(mod7)
+#mean(div.its.df$observed)
+#var(div.its.df$observed)
+# post-hoc comparisons (all variables)
+compa7 = emmeans(mod7, 
+                 specs = pairwise ~ especie, 
+                 type = "response")
+compa7
+compa7.1 = emmeans(mod7,
+                   specs = pairwise ~ especie | sexo,
+                   type = "response")
+compa7.1
+#write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
+
+# Shannon
+mod8 = glm(diversity_shannon ~ especie*sexo, data = div.its.df)
+summary(mod8)
+anova(mod8)
+# post-hoc comparisons
+compa8 = emmeans(mod8, 
+                 specs = pairwise ~ especie, 
+                 type = "response")
+compa8
+compa2.1 = emmeans(mod2, 
+                   specs = pairwise ~ especies, 
+                   type = "response")
+compa2.1
+#modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
+#summary(modx)
+
+# Phylogenetic Diversity index
+mod9 = glm(Phylogenetic_Diversity ~ especie*sexo, data = div.its.df)
+summary(mod9)
+anova(mod9)
+# post-hoc comparisons
+compa3 = emmeans(mod3, 
+                 specs = pairwise ~ especies | sexo, 
+                 type = "response")
+compa3
+compa3.1 = emmeans(mod3, 
+                   specs = pairwise ~ especies, 
+                   type = "response")
+compa3.1
+
+##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data####
+# Now use this data frame to plot 
+p.shannon.its <- boxplot_alpha(its6, 
+                           index = "shannon",
+                           x_var = "especie")
+p.shannon.its
+#fill.colors = c(female="cyan4", male="deeppink4"))
+
+p.shannon <- p.shannon + theme_minimal() + 
+  labs(x="Species", y="Shannon diversity") +
+  theme(axis.text = element_text(size=12),
+        axis.title = element_text(size=16),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size=16))
+p.shannon
+
+# Stripchart of observed ASVs with 1 panel
+ggplot(div.its.df, aes(x=especie, y=observed, color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()
+
+### stripchart de Observed ASVs facet with 2 panels (divided by sex)
+sexos <- c("Female", "Male")
+names(sexos) <- c("hembra", "macho")
+
+riqueza_16 <- ggplot(div.its.df, aes(x=especie, y=observed, color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  theme_bw()+
+  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+
+### stripchart Shannon diversity index facet with 2 panels (divided by sex)
+shannon_16 <- ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+ 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index",
+       title = "")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  theme_bw()+
+  facet_wrap(~sexo,
+             labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+# shannon_16s_1 = shannon_16s_1 + 
+#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+
+### stripchart phylogenetic diversity index facet with 2 panels (divided by sex)
+pd_16 <- ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity,
+                            color=especies))+ 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Phylogenetic Diversity index",
+       title = "")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  theme_bw()+
+  facet_wrap(~sexo,
+             labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+# shannon_16s_1 = shannon_16s_1 + 
+#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+gt <- grid.arrange(riqueza_16, shannon_16, pd_16, 
+                   ncol = 1, nrow = 3)
+
+
+
+
+
+
+
 
 ###############################################################################
 #### Ahora vamos a utilizar el paquete "microbiome" ####

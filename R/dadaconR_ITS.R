@@ -1,29 +1,24 @@
-# Pipeline análisis bioinformatico de ITS2 de néctar floral de cucurbita
-
+# Pipeline for bioinformatic analysis of ITS sequences in Cucurbita species
 # Luis Alberto Villanueva Espino
+
 # Modified from: https://benjjneb.github.io/dada2/ITS_workflow.html
 
-# Entrar al cluster del LANASE
-# dirección
+# Address of LANASE cluster
 # IP: 132.247.186.43
-# Puerto: 60307
+# Port: 60307
 
-# Conexión al cluster
+# Cluster connection
 #ssh villanueva@132.247.186.43 -p 60307
 
-# Activar ambiente de conda - Bioconductor
+# First activate conda environment "Bioconductor"
+# Then, activate R in Bioconductor environment
 
-# conda activate bioconductor
-
-# Activar R dentro del ambiente Bioconductor
-
-
-# Cargamos los paquetes requeridos
+# Loading R packages
 library(dada2)
 library(ShortRead)
 library(Biostrings)
 
-# Moverme al directorio donde se encuentran las muestras:
+# Change to directory where there are files:
 path <- "/home/.lvillanueva/work/analisis_2024/its"
 
 list.files(path)
@@ -366,22 +361,35 @@ head(taxa.print)
 #write.csv(taxa.print, file = "taxa_fungi_all.csv")
 write.csv(taxa.print, file = "taxa_fungi_all_8.csv")
 
+
+#### Analysis post-taxonomic assignation
 ### change directory
-setwd("/home/luis/its_2024")
+setwd("/home/luis/Documents/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
+
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq); packageVersion("phyloseq")
 library(ggplot2)
-#library(VennDiagram) no installed
 library(picante)
 library(ape)
 library("microbiome")
 library("dplyr")
-# library("hrbrthemes")
-# library("gcookbook")
 #library("tidyverse")
 library("RColorBrewer")
 library("ggpubr")
+#library("breakaway") # no instalado
+#library(MicrobiotaProcess)
+#library(reltools)
+library(microbiomeutilities)
+library(vegan)
+library(gridExtra)
+library(tidyr)
+library(reshape2)
+#library(minpack.lm) # no instalado
+library(Hmisc)
+library(stats4)
+#library(patchwork) # no instalado
+
 
 ### Transponer tabla de ASV
 #seqtab.nochim2 <- read.csv("asv_tabla.csv", header = T, row.names = 1)
@@ -426,87 +434,113 @@ plot(arbol_its)
 # Uniendo el arbol con el objeto phyloseq anterior
 its2 = merge_phyloseq(its1, arbol_its)
 its2
+# 1257 ASVs in 364 samples
 
 # Primero resumimos el contenido del objeto phyloseq
 summarize_phyloseq(its2) # reads totales 6,060,868
-
 # información del número de reads
-summary(sample_sums(its2))
+summary(sample_sums(its2)) #range of 0 to 31014
 
-#### grafica de abundancia con phyloseq
-# creamos una primera visualización de la abundancia total de secuencias por
-# muestra a nivel de Reino
-plot_bar(its1, fill = "Kingdom") +
-  geom_bar(aes(color = Kingdom), stat = "identity",
-           position = "stack")
-# abundancia total de secuencias a nivel de Phylum
-plot_bar(its1, fill = "Phylum") +
-  geom_bar(aes(color = Phylum), stat = "identity",
-           position = "stack")
-# Sacamos la abundacia relativa
-ps_re  = transform_sample_counts(its1, function(x) x / sum(x) )
-ps_re
-# Abundancia relativa a nivel de Reino
-plot_bar(ps_re, fill = "Kingdom") +
-  geom_bar(aes(color = Kingdom), stat = "identity", position = "stack")
-# Abundancia relativa a nivel de Phylum
-plot_bar(ps_re, fill = "Phylum") +
-  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
-
+# Filtering samples of Morelia site
+its3 = subset_samples(its2, sitio == "morelia")
 ##### Extraemos todas aquellas secuencias del reino Fungi #####
-its3 = subset_taxa(its2, Kingdom == "k__Fungi")
-its3
-# Despues extraemos las muestras que pertenecen a Morelia 
-its4 = subset_samples(its3, sitio=="morelia")
+its4 = subset_taxa(its3, Kingdom == "k__Fungi")
 its4
 # Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
 # pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
 # muestras que quedaron con 0 secuencias:
 its5 = prune_samples(sample_sums(its4)>1, its4)
 its5
-summary(sample_sums(its5))
-summarize_phyloseq(its5)
+
+# A useful next step is to explore feature prevalence in the dataset,
+# which we will define here as the number of samples in which a taxa appears
+# at least once.
+# Compute prevalence of each feature, store as data.frame
+prevdf_its = apply(X = otu_table(its5),
+               MARGIN = ifelse(taxa_are_rows(its5), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+# Add taxonomy and total read counts to this data.frame
+prevdf_its = data.frame(Prevalence = prevdf_its,
+                    TotalAbundance = taxa_sums(its5),
+                    tax_table(its5))
+# Revisando prevalencia por phylum
+plyr::ddply(prevdf_its, "Phylum", function(df1)
+{cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
+
+# Filtering phyla whose prevalence is 0
+filterPhyla_its = c("p__Chytridiomycota", " p__Mortierellomycota",
+                    "p__Mucoromycota")
+# Filter entries with low prevalence Phylum.
+its6 = subset_taxa(its5, !Phylum %in% filterPhyla_its)
+its6 # Final ASV data set: 592 ASVs
+
+# Primero resumimos el contenido del objeto phyloseq
+summarize_phyloseq(its6) # reads totales 16,692
+sort(sample_sums(its6))
+
+# información del número de reads
+summary(sample_sums(its6))
+range(sample_sums(its6))
+#Library size spans 2 - 2873 reads 
+
 # Obteniendo el número de read por muestra
-reads_sample = readcount(its5)
+reads_sample = readcount(its6)
 reads_sample[1:5]
-write.csv(reads_sample, file = "reads_sample_its_8.csv")
+write.csv(reads_sample, file = "reads_sample_its_todas.csv")
 
-
-# abundancia total a nivel de Phylum
-plot_bar(its5, fill = "Phylum")+ 
+#### grafica de abundancia con phyloseq
+# creamos una primera visualización de la abundancia total de secuencias por
+# muestra a nivel de Phylum
+plot_bar(its6, fill = "Phylum") +
+  geom_bar(aes(color = Phylum), stat = "identity",
+           position = "stack")
+# abundancia total de secuencias a nivel de Order
+plot_bar(its6, fill = "Class") +
+  geom_bar(aes(color = Class), stat = "identity",
+           position = "stack")
+# Sacamos la abundacia relativa
+ps_re  = transform_sample_counts(its6, function(x) x / sum(x) )
+ps_re
+# Abundancia relativa a nivel de Phylum
+plot_bar(ps_re, fill = "Phylum") +
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
-
-# Abundancia relativa de secuencias del reino fungi
-its5_re = transform_sample_counts(its5, function(x) x / sum(x))
-its5_re
-# gráfica de abundancia relativa a nivel de Phylum
-plot_bar(its5_re, fill = "Phylum") +
-  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
-# realizamos la gráfica a nivel de Phylum
-plot_bar(its5_re, fill = "Order")+
-  geom_bar(aes(color = Order), stat = "identity", position = "stack")
-
+# Abundancia relativa a nivel de Class
+plot_bar(ps_re, fill = "Class") +
+  geom_bar(aes(color = Class), stat = "identity", position = "stack")
 
 # Elimando NAs a nivel de phylum
-its2_4 = subset_taxa(its2_3, Phylum != "NA")
-its2_4
+#its2_4 = subset_taxa(its2_3, Phylum != "NA")
+#its2_4
 #
-its2_4_re  = transform_sample_counts(its2_4, function(x) x / sum(x) )
-its2_4_re
+#its2_4_re  = transform_sample_counts(its2_4, function(x) x / sum(x) )
+#its2_4_re
 
-plot_bar(its2_4_re, fill="Phylum") +
-  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+#plot_bar(its2_4_re, fill="Phylum") +
+#  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
 # eliminando muestras sin secuencias
-its2_5 = prune_samples(sample_sums(its2_4)>1, its2_4)
-its2_5
-otu_table(its2_5)
-View(otu_table(its2_5))
+#its2_5 = prune_samples(sample_sums(its2_4)>1, its2_4)
+#its2_5
+#otu_table(its2_5)
+#View(otu_table(its2_5))
 
-its2_5_re  = transform_sample_counts(its2_5, function(x) x / sum(x) )
-its2_5_re
-plot_bar(its2_5_re, fill="Phylum") +
-  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+#its2_5_re  = transform_sample_counts(its2_5, function(x) x / sum(x) )
+#its2_5_re
+#plot_bar(its2_5_re, fill="Phylum") +
+#  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+
+# checking correlation between reads and ASVs observados
+ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
+                         "observed" = phyloseq::estimate_richness(its6,
+                           measures = "Observed")[, 1]),
+       aes(x = total_reads, y = observed)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE) +
+  labs(x = "\nTotal Reads", y = "Observed Richness\n")
+
+
+
+
 
 
 ##### Curvas de Rarefacción ####

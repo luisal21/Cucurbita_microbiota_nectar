@@ -652,8 +652,6 @@ permutest(ps.disper, pairwise = TRUE)
 anova(ps.disper)
 TukeyHSD(ps.disper)
 
-
-
 #### ANALYSIS WITH RAREFIED DATA ####
 ### Calculating relative abundances
 mergedGP <- merge_samples(ps.rarefied50, "especies")
@@ -1209,7 +1207,7 @@ TukeyHSD(ps.disper)
 
 
 
-#### ANALYSIS WITH RAREFIED DATA ####
+#### ANALYSIS WITH PROPORTION DATA ####
 ### Calculating relative abundances
 mergedGP_pro <- merge_samples(s16_6, "especies")
 # Use psmelt to obtain a long-format data.frame

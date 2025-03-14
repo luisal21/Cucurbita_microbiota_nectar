@@ -443,6 +443,7 @@ summary(sample_sums(its2)) #range of 0 to 31014
 
 # Filtering samples of Morelia site
 its3 = subset_samples(its2, sitio == "morelia")
+summarize_phyloseq(its3)
 # 1257 ASVs de 236 samples
 ##### Extraemos todas aquellas secuencias del reino Fungi #####
 its4 = subset_taxa(its3, Kingdom == "k__Fungi")

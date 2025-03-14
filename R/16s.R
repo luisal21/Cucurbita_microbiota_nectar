@@ -46,8 +46,8 @@ meta_16s <- read.csv("meta_16s_2024.csv", header = T)
 head(meta_16s)
 # despues cargar la tabla de ASV
 seqtab.16s <- read.csv("asv_table.csv", header = T, row.names = 1)
-head(seqtab.16s)
-tail(seqtab.16s)
+#head(seqtab.16s)
+#tail(seqtab.16s)
 str(seqtab.16s)
 # Debido a que al cargar el archivo agrega una X al principio del nombre de
 # cada columna, hay que decirle que los nombres de las columnas son iguales

@@ -55,20 +55,20 @@ str(seqtab.16s)
 colnames(seqtab.16s) = meta_16s$sample_id
 str(seqtab.16s)
 # Volver a cargar archivo de metadatos
-meta_16s <- read.csv("meta_16s_2024.csv", header = T, row.names = 1)
-head(meta_16s)
+meta_16s2 <- read.csv("meta_16s_2024.csv", header = T, row.names = 1)
+head(meta_16s2)
 # cargando taxonomia
 taxo_16s <-read.csv("taxa_16s_species_2024.csv", header = T,row.names = 1)
 head(taxo_16s)
 # corrobando match entre archivos
 setdiff(rownames(taxo_16s), rownames(seqtab.16s))
 all(rownames(seqtab.16s) == rownames(taxo_16s))
-all(colnames(seqtab.16s) == unlist(meta_16s[,'sample.id']))
+all(colnames(seqtab.16s) == unlist(meta_16s2[,'sample.id']))
 
 # Construct phyloseq object (straightforward from dada2 outputs)
 s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   tax_table(as.matrix(taxo_16s)), 
-                  sample_data(meta_16s))
+                  sample_data(meta_16s2))
 s16_1
 
 # Building phylogenetic tree with the function rtree of package "ape"
@@ -77,9 +77,11 @@ arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 # Uniendo el arbol con el objeto phyloseq anterior
 s16_2 = merge_phyloseq(s16_1, arbol_16s)
 s16_2
+summarize_phyloseq(s16_2) 
 
 # Filtering samples of Morelia site
 s16_3 = subset_samples(s16_2, sitio=="morelia")
+summarize_phyloseq(s16_3) 
 # Removing Chloroplast and Mitochondria sequences and na samples in condition
 s16_4 = subset_samples(s16_3, condicion !="na")
 s16_4 = subset_taxa(s16_4, Order != "Chloroplast")

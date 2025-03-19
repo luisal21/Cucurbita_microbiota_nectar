@@ -78,8 +78,11 @@ s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
                       "281022-EMo22-SD085", "EMo1223S-SC273",
                       "ENESMo24-bLVEv416s82"))
 
-s16_1
+s16_1 = subset_samples(s16_1, sampleid2 == "ENESMo24-bLVEv416s82")
+View(taxa_names(s16_1))
 
+s16_1
+summarize_phyloseq(s16_1)
 # Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)
@@ -90,11 +93,6 @@ summarize_phyloseq(s16_2) #13,732,428 reads, 4160 ASVs
                           #13,662,937
 
 # Remove contaminants using the frecuency method of the package decontam
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-BiocManager::install("decontam")
-
 library(decontam)
 
 head(sample_data(s16_2))
@@ -129,7 +127,7 @@ sum(sample_sums(s16_2)) - sum(sample_sums(s16_3))
 s16_3 = subset_samples(s16_3, sitio=="morelia")
 summarize_phyloseq(s16_3) 
 # Removing Chloroplast and Mitochondria sequences and na samples in condition
-s16_4 = subset_samples(s16_3, condicion !="na")
+s16_4 = subset_samples(s16_3, condicion !="BLANCO")
 s16_4 = subset_taxa(s16_4, Order != "Chloroplast")
 s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
 # Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias

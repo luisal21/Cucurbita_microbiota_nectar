@@ -71,13 +71,46 @@ s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   sample_data(meta_16s2))
 s16_1
 
+# deleting low quality samples
+head(sample_data(s16_1))
+s16_2 = subset_samples(s16_1, sampleid2 %in% c("281022-EMo22-SA014",
+                      "281022-EMo22-SA035", "281022-EMo22-SD064",
+                      "281022-EMo22-SD085", "EMo1223S-SC273",
+                      "ENESMo24_bLVEv416s82"))
+
+s16_2
+plot_bar(s16_2, fill = "Phylum")+ 
+  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+
+
 # Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)
 # Uniendo el arbol con el objeto phyloseq anterior
 s16_2 = merge_phyloseq(s16_1, arbol_16s)
 s16_2
-summarize_phyloseq(s16_2) 
+summarize_phyloseq(s16_2) #13,732,428 reads, 4160 ASVs
+
+# Remove contaminants using the frecuency method of the package decontam
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("decontam")
+
+library(decontam)
+
+head(sample_data(s16_2))
+
+df <- as.data.frame(sample_data(s16_2)) # Put sample_data into a ggplot-friendly data.frame
+df$LibrarySize <- sample_sums(s16_2)
+df <- df[order(df$LibrarySize),]
+df$Index <- seq(nrow(df))
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=sample_or_control)) + geom_point()
+
+# Identify Contaminants -Frequency
+contamdf.freq <- isContaminant(s16_2, method="frequency", conc="conce_mg")
+head(contamdf.freq)
+
 
 # Filtering samples of Morelia site
 s16_3 = subset_samples(s16_2, sitio=="morelia")

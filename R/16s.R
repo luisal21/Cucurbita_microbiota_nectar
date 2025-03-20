@@ -646,7 +646,7 @@ mergedGP <- merge_samples(ps.rarefied100, "especies")
 phy <- mergedGP %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
 View(phy)
-write.csv(phy, file = "abundancias.csv")
+#write.csv(phy, file = "abundancias.csv")
 
 #mergedtop = merge_samples(topfam, "especies")
 #phy2 <- mergedtop %>% tax_glom(taxrank = "Family") %>%
@@ -752,16 +752,9 @@ library(ggpubr)
 library(gridExtra)
 heatmaps <- grid.arrange(heatmap_hem, heatmap_mac, nrow = 2)
 
-### Save heatmaps
-
-ggsave("heatmaps_june.pdf", 
-       plot = heatmaps,
-       width = 20, 
-       height = 20, 
-       units = "cm")
 
 # Most dominant families en todas las muestras
-domi <- dominant_taxa(ps.rarefied50,level = "Family") #group = "especies"
+domi <- dominant_taxa(ps.rarefied100,level = "Family") #group = "especies"
 View(domi$dominant_overview)
 write.csv(domi$dominant_overview, file = "dominant_overview.csv")
 
@@ -769,7 +762,7 @@ write.csv(domi$dominant_overview, file = "dominant_overview.csv")
 #### CORE MICROBIOTA ####
 
 # PREVALENCE OF TAXONOMIC GROUPS
-ps.rel = microbiome::transform(ps.rarefied50, "compositional")
+ps.rel = microbiome::transform(ps.rarefied100, "compositional")
 # Relative population frequencies; at 1% compositional abundance threshold:
 head(prevalence(ps.rel, detection = 10/100, sort = TRUE))
 # Absolute population frequencies (sample count)
@@ -851,18 +844,14 @@ p <- plot_core(ps.rel,
 print(p)
 
 # Plotting with upsetR
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-BiocManager::install("MicrobiotaProcess")
-
 #install.packages("UpSetR")
 library(MicrobiotaProcess)
 library(UpSetR)
 
 
-uppen <- get_upset(ps.rarefied50, factorNames = "especies")
+uppen <- get_upset(ps.rarefied100, factorNames = "especies")
 View(uppen)
+write.csv(uppen, file = "shared.csv")
 # función para gráficar los ASVs compartidos entre especies
 ?upset
 

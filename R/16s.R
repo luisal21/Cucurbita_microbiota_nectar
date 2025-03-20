@@ -71,26 +71,22 @@ s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   sample_data(meta_16s2))
 s16_1
 
-# deleting low quality samples
-head(sample_data(s16_1))
+# deleting bad quality samples with low reads
 s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
                       "281022-EMo22-SA035", "281022-EMo22-SD064",
                       "281022-EMo22-SD085", "EMo1223S-SC273",
                       "ENESMo24-bLVEv416s82"))
-
-s16_1 = subset_samples(s16_1, sampleid2 == "ENESMo24-bLVEv416s82")
-View(taxa_names(s16_1))
-
 s16_1
 summarize_phyloseq(s16_1)
+
 # Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)
 # Uniendo el arbol con el objeto phyloseq anterior
 s16_2 = merge_phyloseq(s16_1, arbol_16s)
 s16_2
-summarize_phyloseq(s16_2) #13,732,428 reads, 4160 ASVs
-                          #13,662,937
+summarize_phyloseq(s16_2) #13,731,996 reads, 4160 ASVs
+                          
 
 # Remove contaminants using the frecuency method of the package decontam
 library(decontam)
@@ -118,14 +114,14 @@ head(which(contamdf.prev$contaminant))
 
 # Remove this contaminant ASVs
 s16_3 <- prune_taxa(!contamdf.prev$contaminant, s16_2)
-summarize_phyloseq(s16_3)
+summarize_phyloseq(s16_3) #13,343,174 reads, 4112 ASVs
 
 sum(sample_sums(s16_2)) - sum(sample_sums(s16_3))
-# 388692 read identify as contaminants
+# 388822 read identify as contaminants
 
 # Filtering samples of Morelia site
 s16_3 = subset_samples(s16_3, sitio=="morelia")
-summarize_phyloseq(s16_3) 
+summarize_phyloseq(s16_3)  #9,453,681 reads, 4112 ASVs
 # Removing Chloroplast and Mitochondria sequences and na samples in condition
 s16_4 = subset_samples(s16_3, condicion !="BLANCO")
 s16_4 = subset_taxa(s16_4, Order != "Chloroplast")
@@ -135,6 +131,7 @@ s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
 # muestras que quedaron con 0 secuencias:
 s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
 s16_5
+summarize_phyloseq(s16_5) #146,207 reads, 3092 ASVs
 # A useful next step is to explore feature prevalence in the dataset,
 # which we will define here as the number of samples in which a taxa appears
 # at least once.
@@ -158,10 +155,10 @@ filterPhyla = c("Campylobacterota", "Crenarchaeota", "Euryarchaeota",
                 "Fibrobacterota", "Patescibacteria", "Synergistota")
 # Filter entries with low prevalence Phylum.
 s16_6 = subset_taxa(s16_5, !Phylum %in% filterPhyla)
-s16_6 # Final ASV data set: 3116 ASVs
+s16_6 # Final ASV data set: 3082 ASVs in 227 samples
 
 # Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_6) # reads totales 155,244
+summarize_phyloseq(s16_6) # reads totales 146,207
 sort(sample_sums(s16_6))
 
 # información del número de reads
@@ -226,8 +223,10 @@ ps.rarefied1000 <- rarefy_even_depth(s16_6,
                                     1000, rngseed = 1,
                                     replace = FALSE)             
 ps.rarefied1000
+sample_data(ps.rarefied1000)
 # phyloseq object with normalized library size has
 # 754 ASVs in 39 samples
+# 686 ASVs in 36 samples 20-03-2025
 
 ### Normalize library size to 100 reads
 set.seed(111)
@@ -237,6 +236,7 @@ ps.rarefied100 <- rarefy_even_depth(s16_6,
 ps.rarefied100
 # phyloseq object with normalized library size has
 # 906 ASVs in 134 samples
+# 506 ASVs in 132 samples
 reads_sample2 = readcount(ps.rarefied100)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied100)
@@ -253,6 +253,7 @@ ps.rarefied50 # use this rarefied depth
 # 785 ASVs in 168 samples
 # 757 asvs in 168 samples 26/02/2025
 # 784 ASVs in 168 samples 03/03/2025
+# 763 ASVs in 167 samples 20/03/2025
 reads_sample2 = readcount(ps.rarefied50)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied50)
@@ -279,12 +280,12 @@ plot_taxa_prevalence(ps.rarefied50, "Phylum")
                 #### ALPHA DIVERSITY WITH RAREFIED DATA  ####
 library(knitr)
 
-div1 = microbiome::alpha(ps.rarefied50, index = "all")
+div1 = microbiome::alpha(ps.rarefied100, index = "all")
 kable(head(div1))
 View(div1)
 
 # get the metadata out as separate object
-ps1.meta <- meta(ps.rarefied50)
+ps1.meta <- meta(ps.rarefied100)
 kable(head(ps1.meta))
 # Add the rownames as a new colum for easy integration later.
 ps1.meta$sam_name <- rownames(ps1.meta)
@@ -301,21 +302,21 @@ colnames(div.df)
 ### Phylogenetic diversity (Faith)
 library(picante)
 
-ps0.rar.asvtab <- as.data.frame(ps.rarefied50@otu_table)
+ps0.rar.asvtab <- as.data.frame(ps.rarefied100@otu_table)
 
-ps0.rar.tree <- ps.rarefied50@phy_tree
+ps0.rar.tree <- ps.rarefied100@phy_tree
 
 # hmp.meta from previous code chunks
 
 # We first need to check if the tree is rooted or not 
-ps.rarefied50@phy_tree
+ps.rarefied100@phy_tree
 
 # it is a rooted tree
 df.pd <- pd(t(ps0.rar.asvtab), ps0.rar.tree,include.root=T) 
 # t(ou_table) transposes the table for use in picante and the tre file comes
 # from the first code chunck we used to read tree file (see making a phyloseq 
 # object section).
-datatable(df.pd)
+#datatable(df.pd)
 
 # We add the results of PD to this file and then plot
 div.df$Phylogenetic_Diversity <- df.pd$PD
@@ -339,8 +340,11 @@ shapiro.test(div.df$Phylogenetic_Diversity)
 ### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
 library(emmeans)
 # Richness
+mean(div.df$observed)
+var(div.df$observed)
+
 mod1 = glm(observed ~ especies*sexo, data = div.df,
-           family = poisson)
+           family = quasipoisson)
 summary(mod1)
 anova(mod1)
 # post-hoc comparisons (all variables)
@@ -542,16 +546,14 @@ pd_16_group <- ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity,
 gt2 <- grid.arrange(riqueza_16_group, shannon_16_group, pd_16_group, 
                    ncol = 1, nrow = 3)
 
-citation()
-
             ########## BETA DIVERSITY  WITH RAREFIED DATA ##########
 library(vegan)
 #### Unweighted UniFrac ####
 # PCoA plot using the unweighted UniFrac as distance
-ordination_16s = ordinate(ps.rarefied50, method="PCoA", "unifrac",
+ordination_16s = ordinate(ps.rarefied100, method="PCoA", "unifrac",
                           weighted = F)
 
-baseplot_16s <- plot_ordination(ps.rarefied50, ordination_16s,
+baseplot_16s <- plot_ordination(ps.rarefied100, ordination_16s,
                                 color="especies",
                                 type = "samples",
 ) + #shape = "sexo"
@@ -559,7 +561,7 @@ baseplot_16s <- plot_ordination(ps.rarefied50, ordination_16s,
   theme(aspect.ratio=1)+
   theme_bw()+
   geom_point(size = 2)
-baseplot_16s
+baseplot_16s + stat_ellipse()
 #baseplot1 +
 #  geom_point(size = 1) +
 #  geom_label(aes(label = clave), size = 3.5, color = "black")
@@ -572,8 +574,8 @@ baseplot_16s +
 
 #### Weighted UniFrac ####
 # Transform data to relative abundance
-ps.rarefied50
-s16_re = microbiome::transform(ps.rarefied50, "compositional")
+ps.rarefied100
+s16_re = microbiome::transform(ps.rarefied100, "compositional")
 # PCoA plot using the weighted UniFrac as distance
 ordination_16s_2 = ordinate(s16_re, method="PCoA", "wunifrac")
 # Plot
@@ -666,8 +668,8 @@ baseplot_16s_2
 ordu.unwt.uni <- ordinate(s16_6_re, "PCoA", "unifrac", weighted=F)
 
                          #### PERMANOVA ####
-s16_6_rel <- microbiome::transform(ps.rarefied50, "compositional")
-metadf = data.frame(sample_data(ps.rarefied50))
+s16_6_rel <- microbiome::transform(ps.rarefied100, "compositional")
+metadf = data.frame(sample_data(ps.rarefied100))
 # calculating Weighted-UniFrac
 wunifrac.dist <- UniFrac(s16_6_rel, 
                         weighted = TRUE, 
@@ -700,7 +702,7 @@ TukeyHSD(ps.disper)
 
 #### ANALYSIS WITH RAREFIED DATA ####
 ### Calculating relative abundances
-mergedGP <- merge_samples(ps.rarefied50, "especies")
+mergedGP <- merge_samples(ps.rarefied100, "especies")
 # Use psmelt to obtain a long-format data.frame
 phy <- mergedGP %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
@@ -714,7 +716,7 @@ write.csv(phy, file = "abundancias.csv")
 
 #### HEATMAPs of most abundant bacteria ####
 ### Collapse dataset taxonomy to 10 most abundant families
-topfam <- aggregate_top_taxa2(ps.rarefied50, "Family", top = 10)
+topfam <- aggregate_top_taxa2(ps.rarefied100, "Family", top = 10)
 #View(otu_table(topfam))
 topfam
 
@@ -742,8 +744,8 @@ heatmap_k
 
 
 # Separando por sexos florales
-hembras <- subset_samples(ps.rarefied50, sexo == "hembra")
-machos <- subset_samples(ps.rarefied50, sexo == "macho")
+hembras <- subset_samples(ps.rarefied100, sexo == "hembra")
+machos <- subset_samples(ps.rarefied100, sexo == "macho")
 
 ### Calculating relative abundances for Female flowers
 merged_hembras <- merge_samples(hembras, "especies")

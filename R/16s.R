@@ -70,14 +70,13 @@ s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   tax_table(as.matrix(taxo_16s)), 
                   sample_data(meta_16s2))
 s16_1
+summarize_phyloseq(s16_1) #13,732,428 reads, 4160 ASVs
 
 # deleting bad quality samples with low reads
 s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
                       "281022-EMo22-SA035", "281022-EMo22-SD064",
                       "281022-EMo22-SD085", "EMo1223S-SC273",
                       "ENESMo24-bLVEv416s82"))
-s16_1
-summarize_phyloseq(s16_1)
 
 # Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
@@ -110,14 +109,24 @@ head(which(contamdf.freq$contaminant))
 sample_data(s16_2)$is.neg <- sample_data(s16_2)$sample_or_control == "Control Sample"
 contamdf.prev <- isContaminant(s16_2, method="prevalence", neg="is.neg")
 table(contamdf.prev$contaminant)
-head(which(contamdf.prev$contaminant))
+head(which(contamdf.prev$contaminant), 20)
 
-# Remove this contaminant ASVs
+# Make phyloseq object of presence-absence in negative controls and true samples
+ps.pa <- transform_sample_counts(s16_2, function(abund) 1*(abund>0))
+ps.pa.neg <- prune_samples(sample_data(ps.pa)$sample_or_control == "Control Sample", ps.pa)
+ps.pa.pos <- prune_samples(sample_data(ps.pa)$sample_or_control == "True Sample", ps.pa)
+# Make data.frame of prevalence in positive and negative samples
+df.pa <- data.frame(pa.pos=taxa_sums(ps.pa.pos), pa.neg=taxa_sums(ps.pa.neg),
+                    contaminant=contamdf.prev$contaminant)
+ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
+
+### Remove this contaminant ASVs
 s16_3 <- prune_taxa(!contamdf.prev$contaminant, s16_2)
 summarize_phyloseq(s16_3) #13,343,174 reads, 4112 ASVs
 
 sum(sample_sums(s16_2)) - sum(sample_sums(s16_3))
-# 388822 read identify as contaminants
+# 388822 read identify as contaminants of 48 ASVs
 
 # Filtering samples of Morelia site
 s16_3 = subset_samples(s16_3, sitio=="morelia")
@@ -171,6 +180,10 @@ reads_sample = readcount(s16_6)
 reads_sample[1:5]
 #write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
+#s16_7 = subset_samples(s16_6, sampleid2 != "281022-EMo22-SA084")
+#View(otu_table(s16_7))
+#write.csv(otu_table(s16_7), file = "outlier.csv")
+
 # Plotting total abundance to phylum level
 plot_bar(s16_6, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
@@ -223,10 +236,9 @@ ps.rarefied1000 <- rarefy_even_depth(s16_6,
                                     1000, rngseed = 1,
                                     replace = FALSE)             
 ps.rarefied1000
-sample_data(ps.rarefied1000)
 # phyloseq object with normalized library size has
 # 754 ASVs in 39 samples
-# 686 ASVs in 36 samples 20-03-2025
+# 688 ASVs in 36 samples 20-03-2025
 
 ### Normalize library size to 100 reads
 set.seed(111)
@@ -237,11 +249,11 @@ ps.rarefied100
 # phyloseq object with normalized library size has
 # 906 ASVs in 134 samples
 # 506 ASVs in 132 samples
+# 898 ASVs in 132 samples 20/03/2025
 reads_sample2 = readcount(ps.rarefied100)
 reads_sample2[1:20]
-summarize_phyloseq(ps.rarefied100)
+summarize_phyloseq(ps.rarefied100) # 13200 reads
 summary(sample_sums(ps.rarefied100))
-abundances(ps.rarefied100)
 
 ### Normalize library size to 50 reads
 set.seed(111)
@@ -253,7 +265,7 @@ ps.rarefied50 # use this rarefied depth
 # 785 ASVs in 168 samples
 # 757 asvs in 168 samples 26/02/2025
 # 784 ASVs in 168 samples 03/03/2025
-# 763 ASVs in 167 samples 20/03/2025
+# 771 ASVs in 167 samples 20/03/2025
 reads_sample2 = readcount(ps.rarefied50)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied50)
@@ -271,11 +283,11 @@ ps.rarefied10
 # 392 ASVs in 220 samples
 
 # sampling depth
-barplot(sample_sums(ps.rarefied50), las = 2)
+barplot(sample_sums(ps.rarefied100), las = 2)
 
 # taxa prevalence
 plot_taxa_prevalence(s16_6, "Phylum")
-plot_taxa_prevalence(ps.rarefied50, "Phylum")
+plot_taxa_prevalence(ps.rarefied100, "Phylum")
 
                 #### ALPHA DIVERSITY WITH RAREFIED DATA  ####
 library(knitr)
@@ -324,7 +336,7 @@ head(div.df)
 
 
 # data
-div.df$observed
+sort(div.df$observed)
 div.df$diversity_shannon
 div.df$Phylogenetic_Diversity
 # Histograma
@@ -343,10 +355,12 @@ library(emmeans)
 mean(div.df$observed)
 var(div.df$observed)
 
-mod1 = glm(observed ~ especies*sexo, data = div.df,
-           family = quasipoisson)
+mod1 = glm(observed ~ especies*sexo, data = div.df, family = quasipoisson)
 summary(mod1)
 anova(mod1)
+shapiro.test(residuals(mod1))
+plot(residuals(mod1))
+
 # post-hoc comparisons (all variables)
 compa1 = emmeans(mod1, 
         specs = pairwise ~ especies, 
@@ -364,11 +378,11 @@ summary(mod2)
 anova(mod2)
 # post-hoc comparisons
 compa2 = emmeans(mod2, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
+                   specs = pairwise ~ especies, 
+                   type = "response")
 compa2
 compa2.1 = emmeans(mod2, 
-                 specs = pairwise ~ especies, 
+                 specs = pairwise ~ especies | sexo, 
                  type = "response")
 compa2.1
 #modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
@@ -380,11 +394,11 @@ summary(mod3)
 anova(mod3)
 # post-hoc comparisons
 compa3 = emmeans(mod3, 
-                 specs = pairwise ~ especies | sexo, 
+                 specs = pairwise ~ especies, 
                  type = "response")
 compa3
 compa3.1 = emmeans(mod3, 
-                 specs = pairwise ~ especies, 
+                 specs = pairwise ~ especies | sexo, 
                  type = "response")
 compa3.1
 ######## Analysis with kruskal-Wallis and Wilcox text

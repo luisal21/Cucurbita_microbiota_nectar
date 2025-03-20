@@ -409,22 +409,7 @@ pairwise.wilcox.test(div.df$observed, div.df$especies, exact=F)
 kruskal.test(div.df$observed~div.df$sexo)
 pairwise.wilcox.test(div.df$observed, div.df$sexo, exact=F)
 
-##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data####
-# Now use this data frame to plot 
-p.shannon <- boxplot_alpha(ps.rarefied50, 
-                           index = "shannon",
-                           x_var = "especies")
-p.shannon
-#fill.colors = c(female="cyan4", male="deeppink4"))
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x="Species", y="Shannon diversity") +
-  theme(axis.text = element_text(size=12),
-        axis.title = element_text(size=16),
-        legend.text = element_text(size=12),
-        legend.title = element_text(size=16))
-p.shannon
-
+##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data###
 # Stripchart of observed ASVs with 1 panel
 ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
@@ -620,66 +605,6 @@ baseplot_16s_2 +
   facet_wrap(~sexo, labeller = labeller(sexo = sexos))+
   stat_ellipse()
 
-
-# por condicion
-# Weighted UniFrac distance matrix
-wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
-
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
-                                  color="condicion",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 3)+
-  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-  scale_color_discrete(name = "Condition", 
-                       labels = c("Domesticated","Wild"))
-#scale_color_discrete(name = "Treatment",
-#                    labels = c("No-visited","Visited"))
-
-baseplot_16s_2
-#
-baseplot_16s_2 + stat_ellipse()
-
-
-# por sexo
-# Weighted UniFrac distance matrix
-wunifrac_dist_16s = phyloseq::distance(pseq_16s, method="wunifrac")
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(pseq_16s, method="PCoA", distance=wunifrac_dist_16s)
-
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
-                                  color="sexo",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 3)+
-  labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-  scale_color_discrete(name = "Floral sex", 
-                       labels = c("Female","Male"))
-#scale_color_discrete(name = "Treatment",
-#                    labels = c("No-visited","Visited"))
-
-baseplot_16s_2
-#
-baseplot_16s_2 + stat_ellipse()
-
-
-baseplot_16s_2
-baseplot_its_2
-# Juntando gráficas
-gt <- grid.arrange(baseplot_its_2_fungi, baseplot_16s_2, 
-                   ncol = 1, nrow = 2)
-
-
-baseplot_its_2_fungi
-baseplot_16s_2
-
-ordu.unwt.uni <- ordinate(s16_6_re, "PCoA", "unifrac", weighted=F)
 
                          #### PERMANOVA ####
 s16_6_rel <- microbiome::transform(ps.rarefied100, "compositional")

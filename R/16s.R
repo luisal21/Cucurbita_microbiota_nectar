@@ -385,7 +385,7 @@ anova(mod1)
 shapiro.test(residuals(mod1))
 plot(residuals(mod1))
 
-# post-hoc comparisons (all variables)
+# post-hoc comparisons
 compa1 = emmeans(mod1, 
         specs = pairwise ~ especies, 
         type = "response")
@@ -426,12 +426,28 @@ compa3.1 = emmeans(mod3,
                  type = "response")
 compa3.1
 ######## Analysis with kruskal-Wallis and Wilcox text
-# by species
+# Observed by species
 kruskal.test(div.df$observed~div.df$especies)
 pairwise.wilcox.test(div.df$observed, div.df$especies, exact=F)
+# shannon
+kruskal.test(div.df$diversity_shannon~div.df$especies)
+pairwise.wilcox.test(div.df$diversity_shannon, div.df$especies, exact=F)
+# PD
+kruskal.test(div.df$Phylogenetic_Diversity~div.df$especies)
+pairwise.wilcox.test(div.df$Phylogenetic_Diversity, div.df$especies, exact=F)
+
 # by sex
+# Observed
 kruskal.test(div.df$observed~div.df$sexo)
 pairwise.wilcox.test(div.df$observed, div.df$sexo, exact=F)
+# shannon
+kruskal.test(div.df$diversity_shannon~div.df$sexo)
+pairwise.wilcox.test(div.df$diversity_shannon, div.df$sexo, exact=F)
+# PD
+kruskal.test(div.df$Phylogenetic_Diversity~div.df$sexo)
+pairwise.wilcox.test(div.df$Phylogenetic_Diversity, div.df$sexo, exact=F)
+
+
 
 ##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data###
 # Stripchart of observed ASVs with 1 panel
@@ -715,7 +731,7 @@ merged_hembras <- merge_samples(hembras, "especies")
 # Use psmelt to obtain a long-format data.frame
 phy_hembras <- merged_hembras %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-View(phy_hembras)
+#View(phy_hembras)
 write.csv(phy_hembras, file = "abundancias_hembras.csv")
 
 ### Calculating relative abundances for Male flowers
@@ -723,7 +739,7 @@ merged_machos <- merge_samples(machos, "especies")
 # Use psmelt to obtain a long-format data.frame
 phy_machos <- merged_machos %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-View(phy_machos)
+#View(phy_machos)
 write.csv(phy_machos, file = "abundancias_machos.csv")
 
 
@@ -883,17 +899,17 @@ upset(uppen, nsets = 6, mainbar.y.label = "Number of ASVs shared",
       order.by = "freq",
       queries = list(list(query = intersects,
                          params = list("6CM", "5CAA", "4CPP"),
-                          color = "orange",
+                          color = "orange3",
                          active = T),
                      list(query = intersects,
                           params = list("6CM", "5CAA", "4CPP", 
                                         "3CAS", "2CPF", "1CF"),
                           color = "green",
+                          active = T),
+                     list(query = intersects,
+                          params = list("3CAS", "2CPF", "1CF"),
+                          color = "blue",
                           active = T)))
-                     #list(query = intersects,
-                      #    params = list("3CAS", "2CPF", "1CF"),
-                       #   color = "pink",
-                        #  active = T)))
                         #text.scale = 1.1, 
                         #point.size = 2.8, 
                         #line.size = 1

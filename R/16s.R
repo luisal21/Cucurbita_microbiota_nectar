@@ -84,7 +84,7 @@ arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 # Uniendo el arbol con el objeto phyloseq anterior
 s16_2 = merge_phyloseq(s16_1, arbol_16s)
 s16_2
-summarize_phyloseq(s16_2) #13,731,996 reads, 4160 ASVs
+summarize_phyloseq(s16_2) #13,731,996 reads, 4160 ASVs in 356 samples
                           
 
 # Remove contaminants using the frecuency method of the package decontam
@@ -110,6 +110,7 @@ sample_data(s16_2)$is.neg <- sample_data(s16_2)$sample_or_control == "Control Sa
 contamdf.prev <- isContaminant(s16_2, method="prevalence", neg="is.neg")
 table(contamdf.prev$contaminant)
 head(which(contamdf.prev$contaminant), 20)
+View(contamdf.prev)
 
 # Make phyloseq object of presence-absence in negative controls and true samples
 ps.pa <- transform_sample_counts(s16_2, function(abund) 1*(abund>0))
@@ -123,36 +124,31 @@ ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
 
 ### Remove this contaminant ASVs
 s16_3 <- prune_taxa(!contamdf.prev$contaminant, s16_2)
-summarize_phyloseq(s16_3) #13,343,174 reads, 4112 ASVs
-
+summarize_phyloseq(s16_3) #13,343,174 reads, 4112 ASVs in 356 samples
 sum(sample_sums(s16_2)) - sum(sample_sums(s16_3))
 # 388822 read identify as contaminants of 48 ASVs
 
-# Filtering samples of Morelia site
-s16_3 = subset_samples(s16_3, sitio=="morelia")
-summarize_phyloseq(s16_3)  #9,453,681 reads, 4112 ASVs
-# Removing Chloroplast and Mitochondria sequences and na samples in condition
-s16_4 = subset_samples(s16_3, condicion !="BLANCO")
-s16_4 = subset_taxa(s16_4, Order != "Chloroplast")
-s16_4 = subset_taxa(s16_4, Family != "Mitochondria")
-# Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
-# pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
-# muestras que quedaron con 0 secuencias:
-s16_5 = prune_samples(sample_sums(s16_4)>1, s16_4)
-s16_5
-summarize_phyloseq(s16_5) #146,207 reads, 3092 ASVs
-# A useful next step is to explore feature prevalence in the dataset,
+################### Extracting only contaminants ##############################
+contaminantes <- prune_taxa(contamdf.prev$contaminant, s16_2) 
+contaminantes2 = prune_samples(sample_sums(contaminantes)>=0, contaminantes)
+View(tax_table(contaminantes2))
+# Plotting total abundance to phylum level of contaminants
+plot_bar(contaminantes2, fill = "Phylum")+ 
+  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+###############################################################################
+
+### A useful next step is to explore feature prevalence in the dataset,
 # which we will define here as the number of samples in which a taxa appears
 # at least once.
 
 # Compute prevalence of each feature, store as data.frame
-prevdf = apply(X = otu_table(s16_5),
-               MARGIN = ifelse(taxa_are_rows(s16_5), yes = 1, no = 2),
+prevdf = apply(X = otu_table(s16_3),
+               MARGIN = ifelse(taxa_are_rows(s16_3), yes = 1, no = 2),
                FUN = function(x){sum(x > 0)})
 # Add taxonomy and total read counts to this data.frame
 prevdf = data.frame(Prevalence = prevdf,
-                    TotalAbundance = taxa_sums(s16_5),
-                    tax_table(s16_5))
+                    TotalAbundance = taxa_sums(s16_3),
+                    tax_table(s16_3))
 #View(prevdf)
 #write.csv(prevdf, file = "prevalencia.csv")
 
@@ -162,12 +158,39 @@ plyr::ddply(prevdf, "Phylum", function(df1)
 # Filtering phyla whose prevalence is 0
 filterPhyla = c("Campylobacterota", "Crenarchaeota", "Euryarchaeota",
                 "Fibrobacterota", "Patescibacteria", "Synergistota")
+
+# Filtering phyla whose prevalence is 1
+filterPhyla = c("Euryarchaeota", "FCPU426", "RCP2-54",
+                "Synergistota", "Thermotogota", "WPS-2")
 # Filter entries with low prevalence Phylum.
-s16_6 = subset_taxa(s16_5, !Phylum %in% filterPhyla)
-s16_6 # Final ASV data set: 3082 ASVs in 227 samples
+s16_4 = subset_taxa(s16_3, !Phylum %in% filterPhyla)
+s16_4 # Final ASV data set: 4106 ASVs in 227 samples
+
+
+# Filtering samples of Morelia site
+s16_5 = subset_samples(s16_4, sitio=="morelia")
+summarize_phyloseq(s16_5)  #9,453,658 reads, 4106 ASVs
+# Removing Chloroplast and Mitochondria sequences and na samples in condition
+s16_5 = subset_samples(s16_5, condicion !="BLANCO")
+s16_5 = subset_taxa(s16_5, Order != "Chloroplast")
+s16_5 = subset_taxa(s16_5, Family != "Mitochondria")
+# Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
+# pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
+# muestras que quedaron con 0 secuencias:
+s16_5 = prune_samples(sample_sums(s16_5)>1, s16_5)
+s16_5
+summarize_phyloseq(s16_5) #146,201 reads, 3089 ASVs
+
+#Remove taxa with 0 observation
+s16_6 <- prune_taxa(taxa_sums(s16_5) > 0, s16_5)
+s16_6
+summarize_phyloseq(s16_6) #146,201 reads, 1635 ASVs in 227 samples
+
+View(otu_table(s16_6))
+write.csv(otu_table(s16_6), file = "s16_6.csv")
 
 # Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_6) # reads totales 146,207
+summarize_phyloseq(s16_6) # reads totales 146,201
 sort(sample_sums(s16_6))
 
 # información del número de reads
@@ -250,6 +273,7 @@ ps.rarefied100
 # 906 ASVs in 134 samples
 # 506 ASVs in 132 samples
 # 898 ASVs in 132 samples 20/03/2025
+# 901 ASVs in 132 samples 21/03/2025
 reads_sample2 = readcount(ps.rarefied100)
 reads_sample2[1:20]
 summarize_phyloseq(ps.rarefied100) # 13200 reads

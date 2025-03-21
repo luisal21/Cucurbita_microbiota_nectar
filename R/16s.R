@@ -930,7 +930,7 @@ head(div.df2)
 
 
 # data
-div.df2$observed
+sort(div.df2$observed)
 div.df2$diversity_shannon
 div.df2$Phylogenetic_Diversity
 # Histograma
@@ -1095,10 +1095,10 @@ s16_6 # phyloseq object filtered but no rarefied
 library(vegan)
 #### Unweighted UniFrac ####
 # PCoA plot using the unweighted UniFrac as distance
-ordination_16s = ordinate(s16_6, method="PCoA", "unifrac",
+ordination_16s_pro = ordinate(s16_6, method="PCoA", "unifrac",
                           weighted = F)
 
-baseplot_16s <- plot_ordination(s16_6, ordination_16s,
+baseplot_16s <- plot_ordination(s16_6, ordination_16s_pro,
                                 color="especies",
                                 type = "samples",
 ) + #shape = "sexo"
@@ -1119,9 +1119,9 @@ baseplot_16s +
 
 #### Weighted UniFrac ####
 # PCoA plot using the weighted UniFrac as distance
-ordination_16s_2 = ordinate(pseq_16s, method="PCoA", "wunifrac")
+ordination_16s_2_pro = ordinate(pseq_16s, method="PCoA", "wunifrac")
 # Plot
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2,
+baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2_pro,
                                   color="especies",
                                   type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("Bacteria")+

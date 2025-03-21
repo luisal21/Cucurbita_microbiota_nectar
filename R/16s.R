@@ -1190,7 +1190,7 @@ mergedGP_pro <- merge_samples(s16_6, "especies")
 phy_pro <- mergedGP_pro %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
 View(phy_pro)
-write.csv(phy, file = "abundancias_family_propor.csv")
+write.csv(phy_pro, file = "abundancias_family_propor.csv")
 
 #mergedtop = merge_samples(topfam, "especies")
 #phy2 <- mergedtop %>% tax_glom(taxrank = "Family") %>%
@@ -1236,7 +1236,7 @@ merged_hembras_pro <- merge_samples(hembras_pro, "especies")
 phy_hembras_pro <- merged_hembras_pro %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
 View(phy_hembras_pro)
-write.csv(phy_hembras, file = "abundancias_hembras.csv")
+write.csv(phy_hembras_pro, file = "abundancias_hembras_pro.csv")
 
 ### Calculating relative abundances for Male flowers
 merged_machos_pro <- merge_samples(machos_pro, "especies")
@@ -1244,7 +1244,7 @@ merged_machos_pro <- merge_samples(machos_pro, "especies")
 phy_machos_pro <- merged_machos_pro %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
 View(phy_machos_pro)
-write.csv(phy_machos, file = "abundancias_machos.csv")
+write.csv(phy_machos_pro, file = "abundancias_machos_pro.csv")
 
 
 # Flores hembra
@@ -1296,18 +1296,10 @@ library(ggpubr)
 library(gridExtra)
 heatmaps <- grid.arrange(heatmap_hempro, heatmap_macpro, nrow = 2)
 
-### Save heatmaps
-
-ggsave("heatmaps_june.pdf", 
-       plot = heatmaps,
-       width = 20, 
-       height = 20, 
-       units = "cm")
-
 # Most dominant families en todas las muestras
 domipro <- dominant_taxa(s16_6,level = "Family") #group = "especies"
-View(domipro$dominant_overview)
-write.csv(domi$dominant_overview, file = "dominant_overview.csv")
+#View(domipro$dominant_overview)
+write.csv(domipro$dominant_overview, file = "dominant_overview_pro.csv")
 
 
 #### CORE MICROBIOTA ####
@@ -1395,12 +1387,6 @@ p <- plot_core(ps.rel,
 print(p)
 
 # Plotting with upsetR
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-BiocManager::install("MicrobiotaProcess")
-
-#install.packages("UpSetR")
 library(MicrobiotaProcess)
 library(UpSetR)
 

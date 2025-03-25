@@ -413,40 +413,61 @@ str(seqtab.its)
 colnames(seqtab.its) = meta_its$sample.id
 str(seqtab.its)
 # Volver a cargar archivo de metadatos
-meta_its <- read.csv("its_metadata_2024.csv", header = T, row.names = 1)
-head(meta_its)
+meta_its2 <- read.csv("its_metadata_2024.csv", header = T, row.names = 1)
+head(meta_its2)
 # cargando taxonomia
 taxo_its <-read.csv("taxa_fungi_all_2024.csv", header = T,row.names = 1)
 head(taxo_its)
 # corrobando match entre archivos
 setdiff(rownames(taxo_its), rownames(seqtab.its))
 all(rownames(seqtab.its) == rownames(taxo_its))
-all(colnames(seqtab.its) == unlist(meta_its[,'sample.id']))
+all(colnames(seqtab.its) == unlist(meta_its2[,'sample.id']))
 
 # Construct phyloseq object (straightforward from dada2 outputs)
 its1 <- phyloseq(otu_table(as.matrix(seqtab.its), taxa_are_rows=T),
                tax_table(as.matrix(taxo_its)), 
-               sample_data(meta_its))
+               sample_data(meta_its2))
 its1
+
 # obteniendo el arbol filogenetico
 arbol_its = rtree(ntaxa(its1), rooted=TRUE, tip.label=taxa_names(its1))
 plot(arbol_its)
 # Uniendo el arbol con el objeto phyloseq anterior
 its2 = merge_phyloseq(its1, arbol_its)
 its2
-# 1257 ASVs in 364 samples
-
 # Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(its2) # reads totales 6,060,868
+summarize_phyloseq(its2) # reads totales 6,060,868, 1257 ASVs in 364 samples
 # información del número de reads
 summary(sample_sums(its2)) #range of 0 to 31014
 
+# A useful next step is to explore feature prevalence in the dataset,
+# which we will define here as the number of samples in which a taxa appears
+# at least once.
+# Compute prevalence of each feature, store as data.frame
+prevdf_its = apply(X = otu_table(its2),
+                   MARGIN = ifelse(taxa_are_rows(its2), yes = 1, no = 2),
+                   FUN = function(x){sum(x > 0)})
+# Add taxonomy and total read counts to this data.frame
+prevdf_its = data.frame(Prevalence = prevdf_its,
+                        TotalAbundance = taxa_sums(its2),
+                        tax_table(its2))
+# Revisando prevalencia por phylum
+plyr::ddply(prevdf_its, "Phylum", function(df1)
+{cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
+
+# Filtering phyla whose prevalence is 1 (only present in one sample)
+filterPhyla_its = c("p__Bryophyta","p__Chytridiomycota", "p__Monilophyta"
+                    ,"p__Mortierellomycota")
+# Filter entries with low prevalence Phylum.
+its3 = subset_taxa(its2, !Phylum %in% filterPhyla_its)
+its3 # Final ASV data set: 1253 ASVs in 364 samples
+
+
 # Filtering samples of Morelia site
-its3 = subset_samples(its2, sitio == "morelia")
-summarize_phyloseq(its3)
-# 1257 ASVs de 236 samples
+its4 = subset_samples(its3, sitio == "morelia")
+summarize_phyloseq(its4)  #3,796,606 reads, 1253 ASVs de 236 samples
 ##### Extraemos todas aquellas secuencias del reino Fungi #####
-its4 = subset_taxa(its3, Kingdom == "k__Fungi")
+its4 = subset_taxa(its4, Kingdom == "k__Fungi")
 its4
 # Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
 # pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
@@ -454,30 +475,10 @@ its4
 its5 = prune_samples(sample_sums(its4)>1, its4)
 its5
 
-# A useful next step is to explore feature prevalence in the dataset,
-# which we will define here as the number of samples in which a taxa appears
-# at least once.
-# Compute prevalence of each feature, store as data.frame
-prevdf_its = apply(X = otu_table(its5),
-               MARGIN = ifelse(taxa_are_rows(its5), yes = 1, no = 2),
-               FUN = function(x){sum(x > 0)})
-# Add taxonomy and total read counts to this data.frame
-prevdf_its = data.frame(Prevalence = prevdf_its,
-                    TotalAbundance = taxa_sums(its5),
-                    tax_table(its5))
-# Revisando prevalencia por phylum
-plyr::ddply(prevdf_its, "Phylum", function(df1)
-{cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
-
-# Filtering phyla whose prevalence is 0
-filterPhyla_its = c("p__Chytridiomycota", "p__Mortierellomycota",
-                    "p__Mucoromycota")
-# Filter entries with low prevalence Phylum.
-its6 = subset_taxa(its5, !Phylum %in% filterPhyla_its)
-its6 # Final ASV data set: 592 ASVs
-
-# Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(its6) # reads totales 16,692
+#Remove taxa with 0 observation
+its6 <- prune_taxa(taxa_sums(its5) > 0, its5)
+its6
+summarize_phyloseq(its6) #16692 reads, 210 ASVs in 178 samples
 sort(sample_sums(its6))
 
 # información del número de reads
@@ -489,6 +490,7 @@ range(sample_sums(its6))
 reads_sample = readcount(its6)
 reads_sample[1:5]
 #write.csv(reads_sample, file = "reads_sample_its_todas.csv")
+
 
 # Get count of phyla
 table(phyloseq::tax_table(its6)[,"Phylum"])

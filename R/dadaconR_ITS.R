@@ -923,6 +923,7 @@ View(phy_its)
 
 #### HEATMAPs of most abundant bacteria ####
 ### Collapse dataset taxonomy to 10 most abundant families
+library(microbiomeutilities)
 topfam_its <- aggregate_top_taxa2(its6, "Family", top = 10)
 View(otu_table(topfam_its))
 topfam_its
@@ -959,7 +960,7 @@ merged_hembras_its <- merge_samples(hembras_its, "especie")
 # Use psmelt to obtain a long-format data.frame
 phy_hembras_its <- merged_hembras_its %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-View(phy_hembras_its)
+#View(phy_hembras_its)
 write.csv(phy_hembras_its, file = "abundancias_hembras_its.csv")
 
 ### Calculating relative abundances for Male flowers

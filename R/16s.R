@@ -528,8 +528,17 @@ pd_16 <- ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity,
 # cargando paqueteria gridExtra
 library(gridExtra)
 library(cowplot)
-gt <- grid.arrange(riqueza_16, shannon_16, pd_16, 
-                   ncol = 1, nrow = 3)
+
+gt_s16 = ggarrange(riqueza_16, shannon_16, pd_16,
+                   nrow = 3, labels = "AUTO")
+gt_s16
+
+
+gt.its = ggarrange(riqueza_its, shannon_its, pd_its,
+                     nrow = 3, labels = "AUTO")
+gt.its
+
+
 
 ###### OTRO TIPO DE GRÁFICA ####
 ### gráfica de riqueza por especie y sexo 1 panel
@@ -621,10 +630,17 @@ ordination_16s_2 = ordinate(s16_re, method="PCoA", "wunifrac")
 baseplot_16s_2 <- plot_ordination(s16_re, ordination_16s_2,
                                   color="especies",
                                   type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
+  ggtitle("Bacterias")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 3)
+  geom_point(size = 3)+
+  scale_color_discrete(name = "Especies", 
+                     labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))
+
+
+  #scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+   #                         "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))
   #labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
   #scale_color_discrete(name = "Condition", 
   #                    labels = c("Domesticated","Wild"))+
@@ -633,7 +649,12 @@ baseplot_16s_2 <- plot_ordination(s16_re, ordination_16s_2,
 
 baseplot_16s_2
 #
-baseplot_16s_2 + stat_ellipse()
+wei_16s = baseplot_16s_2 + stat_ellipse(type = "norm", linetype = 2)
+#+ coord_fixed()
+
+#+ stat_ellipse(type = "t")
+baseplot_16s_2 + stat_ellipse(type = "t")
+
 #
 #baseplot2 +
 #  geom_point(size = 1) +
@@ -643,8 +664,11 @@ baseplot_16s_2 +
   geom_point(size = 2)+
   ggtitle("")+
   facet_wrap(~sexo, labeller = labeller(sexo = sexos))+
-  stat_ellipse()
+  stat_ellipse(type = "norm", linetype = 2)
 
+
+ggarrange(wei_16s,
+          wei_its, nrow = 2)
 
                          #### PERMANOVA ####
 s16_6_rel <- microbiome::transform(ps.rarefied100, "compositional")
@@ -790,7 +814,17 @@ heatmap_mac
 ### Arrange heatmaps in one graphic
 library(ggpubr)
 library(gridExtra)
-heatmaps <- grid.arrange(heatmap_hem, heatmap_mac, nrow = 2)
+heatmaps_16s <- grid.arrange(heatmap_hem, heatmap_mac, nrow = 2,
+                             labels="AUTO")
+
+heatmaps_16s = ggarrange(heatmap_hem, heatmap_mac, nrow = 2,
+                         labels=c("FEMALE", "MALE"))
+heatmaps_16s
+
+# para cartel
+heatmaps_cartel <- grid.arrange(heatmap_hem, heatmap_mac,
+                                heatmap_hemits, heatmap_macits,
+                                nrow = 2, ncol = 2)
 
 
 # Most dominant families en todas las muestras

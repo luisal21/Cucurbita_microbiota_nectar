@@ -713,7 +713,7 @@ compa3.1 = emmeans(mod3,
                    type = "response")
 compa3.1
 
-##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data####
+##### VISUALIZATION  OF ALPHA DIVERSITY without rarefied data####
 # Now use this data frame to plot 
 p.shannon.its <- boxplot_alpha(its6, 
                            index = "shannon",
@@ -848,10 +848,13 @@ ordination_its_2 = ordinate(its_re, method="PCoA", "wunifrac")
 baseplot_its_2 <- plot_ordination(its_re, ordination_its_2,
                                   color="especie",
                                   type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Fungi")+
+  ggtitle("Hongos")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 3)
+  geom_point(size = 3)+
+scale_color_discrete(name = "Especies", 
+                     labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))
 #labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
 #scale_color_discrete(name = "Condition", 
 #                    labels = c("Domesticated","Wild"))+
@@ -860,7 +863,7 @@ baseplot_its_2 <- plot_ordination(its_re, ordination_its_2,
 
 baseplot_its_2
 #
-baseplot_its_2 + stat_ellipse()
+wei_its = baseplot_its_2 + stat_ellipse(type = "norm", linetype = 2)
 #
 #baseplot2 +
 #  geom_point(size = 1) +
@@ -1020,6 +1023,10 @@ heatmap_macits
 library(ggpubr)
 library(gridExtra)
 heatmaps.its <- grid.arrange(heatmap_hemits, heatmap_macits, nrow = 2)
+
+heatmaps_its = ggarrange(heatmap_hemits, heatmap_macits, nrow = 2,
+                         labels=c("FEMALE", "MALE"))
+heatmaps_its
 
 ### Save heatmaps
 

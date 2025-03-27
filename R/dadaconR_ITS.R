@@ -734,8 +734,8 @@ ggplot(div.its.df, aes(x=especie, y=observed, color=especie)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
-  scale_color_discrete(name = "Species", 
+  labs(x="Especies", y = "Riqueza de ASVs")+
+  scale_color_discrete(name = "Especies", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -745,15 +745,15 @@ ggplot(div.its.df, aes(x=especie, y=observed, color=especie)) +
   theme_bw()
 
 ### stripchart de Observed ASVs facet with 2 panels (divided by sex)
-sexos <- c("Female", "Male")
+sexos <- c("Hembras", "Machos")
 names(sexos) <- c("hembra", "macho")
 
 riqueza_its <- ggplot(div.its.df, aes(x=especie, y=observed, color=especie)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 1)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
-  scale_color_discrete(name = "Species", 
+  labs(x="Especies", y = "Riqueza de ASVs")+
+  scale_color_discrete(name = "Especies", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -769,9 +769,9 @@ shannon_its <- ggplot(div.its.df, aes(x=especie, y=diversity_shannon,
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index",
+  labs(x="Especies", y = "Indice de diversidad de Shannon",
        title = "")+
-  scale_color_discrete(name = "Species", 
+  scale_color_discrete(name = "Especies", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -784,6 +784,10 @@ shannon_its <- ggplot(div.its.df, aes(x=especie, y=diversity_shannon,
 # shannon_16s_1 = shannon_16s_1 + 
 #stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
 shannon_its
+
+cartel2 =  ggarrange(riqueza_its, shannon_its,
+                     nrow = 2, labels = "AUTO")
+cartel2
 ### stripchart phylogenetic diversity index facet with 2 panels (divided by sex)
 pd_its <- ggplot(div.its.df, aes(x=especie, y=Phylogenetic_Diversity,
                             color=especie))+ 
@@ -873,7 +877,7 @@ baseplot_its_2 +
   geom_point(size = 2)+
   ggtitle("")+
   facet_wrap(~sexo, labeller = labeller(sexo = sexos))+
-  stat_ellipse()
+  stat_ellipse(type = "norm", linetype = 2)
 
 
 #### PERMANOVA ####
@@ -1025,7 +1029,7 @@ library(gridExtra)
 heatmaps.its <- grid.arrange(heatmap_hemits, heatmap_macits, nrow = 2)
 
 heatmaps_its = ggarrange(heatmap_hemits, heatmap_macits, nrow = 2,
-                         labels=c("FEMALE", "MALE"))
+                         labels=c("Hembras", "Machos"))
 heatmaps_its
 
 ### Save heatmaps

@@ -455,8 +455,8 @@ ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
-  scale_color_discrete(name = "Species", 
+  labs(x="Especies", y = "Riqueza de ASVs")+
+  scale_color_discrete(name = "Especies", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -466,15 +466,15 @@ ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   theme_bw()
 
 ### stripchart de Observed ASVs facet with 2 panels (divided by sex)
-sexos <- c("Female", "Male")
+sexos <- c("Hembras", "Machos")
 names(sexos) <- c("hembra", "macho")
 
 riqueza_16 <- ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 1)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
-  scale_color_discrete(name = "Species", 
+  labs(x="Especies", y = "Riqueza de ASVs")+
+  scale_color_discrete(name = "Especies", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -483,15 +483,15 @@ riqueza_16 <- ggplot(div.df, aes(x=especies, y=observed, color=especies)) +
   facet_wrap(~sexo, labeller = labeller(sexo = sexos))
 #stat_summary(fun=mean, geom="point", shape=18,
 #            size=6, color="red")
-
+riqueza_16
 ### stripchart Shannon diversity index facet with 2 panels (divided by sex)
 shannon_16 <- ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies))+ 
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index",
+  labs(x="Especies", y = "Indice de diversidad de Shannon",
        title = "")+
-  scale_color_discrete(name = "Species", 
+  scale_color_discrete(name = "Especies", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
@@ -503,7 +503,11 @@ shannon_16 <- ggplot(div.df, aes(x=especies, y=diversity_shannon, color=especies
   #            size=6, color="red")
   # shannon_16s_1 = shannon_16s_1 + 
   #stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+shannon_16
 
+cartel1 = ggarrange(riqueza_16, shannon_16,
+                             nrow = 2, labels = "AUTO")
+cartel1
 ### stripchart phylogenetic diversity index facet with 2 panels (divided by sex)
 pd_16 <- ggplot(div.df, aes(x=especies, y=Phylogenetic_Diversity,
                             color=especies))+ 
@@ -818,7 +822,7 @@ heatmaps_16s <- grid.arrange(heatmap_hem, heatmap_mac, nrow = 2,
                              labels="AUTO")
 
 heatmaps_16s = ggarrange(heatmap_hem, heatmap_mac, nrow = 2,
-                         labels=c("FEMALE", "MALE"))
+                         labels=c("Hembras", "Machos"))
 heatmaps_16s
 
 # para cartel

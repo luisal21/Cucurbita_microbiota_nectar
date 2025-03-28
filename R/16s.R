@@ -732,6 +732,14 @@ transform <- microbiome::transform
 famrel <- transform(topfam, "compositional")
 #View(otu_table(famrel))
 
+### Define colors for heatmap
+heat.cols <- c("#F4D166","#146C36")
+### Create a gradient color palette for abundance
+grad_ab <- colorRampPalette(c("#F4D166","#146C36"))
+heat.cols <- grad_ab(10)
+
+paletteer_c("ggthemes::Green-Gold", 30)
+
 ### Heatmap for 10 most abundant bacterial families between species
 heatmap_k <- simple_heatmap(famrel,
                             group.facet = "especies",
@@ -741,7 +749,7 @@ heatmap_k <- simple_heatmap(famrel,
                             level = "Family",
                             scale.color = "log10",
                             na.fill = "white",
-                            color.fill = NULL,
+                            color.fill = heat.cols,
                             taxa.arrange=TRUE,
                             remove.other=TRUE,
                             panel.arrange="grid",
@@ -785,7 +793,7 @@ heatmap_hem <- simple_heatmap(famrel_hem,
                             level = "Family",
                             scale.color = "log10",
                             na.fill = "white",
-                            color.fill = NULL,
+                            color.fill = heat.cols,
                             taxa.arrange=TRUE,
                             remove.other=TRUE,
                             panel.arrange="grid",
@@ -807,7 +815,7 @@ heatmap_mac <- simple_heatmap(famrel_mac,
                               level = "Family",
                               scale.color = "log10",
                               na.fill = "white",
-                              color.fill = NULL,
+                              color.fill = heat.cols,
                               taxa.arrange=TRUE,
                               remove.other=TRUE,
                               panel.arrange="grid",

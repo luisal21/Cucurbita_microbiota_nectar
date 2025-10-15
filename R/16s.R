@@ -31,7 +31,8 @@ library(stats4)
 
 
 #### Set up directory in which the databases are located ####
-setwd("/home/luis/Documents/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
+
 
 ### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
 # deshabilitar este codigo
@@ -77,7 +78,7 @@ s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
                       "281022-EMo22-SA035", "281022-EMo22-SD064",
                       "281022-EMo22-SD085", "EMo1223S-SC273",
                       "ENESMo24-bLVEv416s82"))
-
+s16_1
 # Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)

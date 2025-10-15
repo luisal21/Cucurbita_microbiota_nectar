@@ -1,6 +1,11 @@
 ### Análisis de las secuencias de 16s
 # Luis Alberto Villanueva Espino
 
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("phyloseq")
+
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq)

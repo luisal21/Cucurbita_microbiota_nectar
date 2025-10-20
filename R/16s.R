@@ -11,26 +11,26 @@ BiocManager::install("phyloseq")
 library(phyloseq)
 library(ggplot2)
 #library(VennDiagram) # no instalado
-library(picante)
+library(picante) #falta
 library(ape)
-library("microbiome")
-library("dplyr")
+library("microbiome") #falta
+library("dplyr") #falta
 #library("hrbrthemes") # no instalado
 #library("gcookbook") # no instalado
 #library("tidyverse")
 library("RColorBrewer")
-library("ggpubr")
+library("ggpubr") #falta
 #library("breakaway") # no instalado
 #library(MicrobiotaProcess)
 #library(reltools)
-library(microbiomeutilities)
+library(microbiomeutilities) #falta
 library(vegan)
-library(gridExtra)
-library(tidyr)
+library(gridExtra) #falta
+library(tidyr) #falta
 library(reshape2)
 #library(UpSetR) # no instalado
 #library(minpack.lm) # no instalado
-library(Hmisc)
+library(Hmisc) #falta
 library(stats4)
 #library(patchwork) # no instalado
 

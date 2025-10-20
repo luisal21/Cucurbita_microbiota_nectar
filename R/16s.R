@@ -5,32 +5,35 @@ if (!require("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 
 BiocManager::install("phyloseq")
+BiocManager::install("microbiome")
 
+install.packages("devtools")
+devtools::install_github("microsud/microbiomeutilities")
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq)
 library(ggplot2)
 #library(VennDiagram) # no instalado
-library(picante) #falta
+library(picante)
 library(ape)
-library("microbiome") #falta
-library("dplyr") #falta
+library("microbiome")
+library("dplyr")
 #library("hrbrthemes") # no instalado
 #library("gcookbook") # no instalado
 #library("tidyverse")
 library("RColorBrewer")
-library("ggpubr") #falta
+library("ggpubr")
 #library("breakaway") # no instalado
 #library(MicrobiotaProcess)
 #library(reltools)
 library(microbiomeutilities) #falta
 library(vegan)
-library(gridExtra) #falta
-library(tidyr) #falta
+library(gridExtra)
+library(tidyr)
 library(reshape2)
 #library(UpSetR) # no instalado
 #library(minpack.lm) # no instalado
-library(Hmisc) #falta
+library(Hmisc) 
 library(stats4)
 #library(patchwork) # no instalado
 

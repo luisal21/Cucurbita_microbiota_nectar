@@ -1,14 +1,15 @@
 ### Análisis de las secuencias de 16s
 # Luis Alberto Villanueva Espino
 
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+#if (!require("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
 
-BiocManager::install("phyloseq")
-BiocManager::install("microbiome")
+#BiocManager::install("phyloseq")
+#BiocManager::install("microbiome")
+BiocManager::install("decontam")
 
-install.packages("devtools")
-devtools::install_github("microsud/microbiomeutilities")
+#install.packages("devtools")
+#devtools::install_github("microsud/microbiomeutilities")
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq)
@@ -136,7 +137,7 @@ s16_3 <- prune_taxa(!contamdf.prev$contaminant, s16_2)
 summarize_phyloseq(s16_3) #13,343,174 reads, 4112 ASVs in 356 samples
 sum(sample_sums(s16_2)) - sum(sample_sums(s16_3))
 # 388822 read identify as contaminants of 48 ASVs
-
+s16_3
 ################### Extracting only contaminants ##############################
 contaminantes <- prune_taxa(contamdf.prev$contaminant, s16_2) 
 contaminantes2 = prune_samples(sample_sums(contaminantes)>=0, contaminantes)
@@ -173,11 +174,12 @@ filterPhyla = c("Euryarchaeota", "FCPU426", "RCP2-54",
                 "Synergistota", "Thermotogota", "WPS-2")
 # Filter entries with low prevalence Phylum.
 s16_4 = subset_taxa(s16_3, !Phylum %in% filterPhyla)
-s16_4 # Final ASV data set: 4106 ASVs in 227 samples
+s16_4 # Final ASV data set: 4106 ASVs in 356 samples
 
 
 # Filtering samples of Morelia site
 s16_5 = subset_samples(s16_4, sitio=="morelia")
+s16_5
 summarize_phyloseq(s16_5)  #9,453,658 reads, 4106 ASVs
 # Removing Chloroplast and Mitochondria sequences and na samples in condition
 s16_5 = subset_samples(s16_5, condicion !="BLANCO")

@@ -1020,7 +1020,7 @@ div.df2$Phylogenetic_Diversity <- df.pd2$PD
 head(div.df2)
 
 
-#### DIVIDIENDO POR SEXO FLORAL ####
+#### Diversidad alpha en flores hembra ####
 head(div.df2)
 hembras_alfa = subset(div.df2, sexo == "hembra")
 str(hembras_alfa)
@@ -1039,7 +1039,7 @@ shapiro.test(hembras_alfa$diversity_shannon)
 shapiro.test(hembras_alfa$Phylogenetic_Diversity)
 
 #### STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
-# Analysis with kruskal-Wallis and Wilcox text #
+# Analysis with kruskal-Wallis and Wilcox text in female flowers #
 # Observed by species
 kruskal.test(hembras_alfa$observed~hembras_alfa$especies)
 pairwise.wilcox.test(hembras_alfa$observed, hembras_alfa$especies, exact=F)
@@ -1051,16 +1051,36 @@ pairwise.wilcox.test(hembras_alfa$diversity_shannon, hembras_alfa$especies, exac
 kruskal.test(hembras_alfa$Phylogenetic_Diversity~hembras_alfa$especies)
 pairwise.wilcox.test(hembras_alfa$Phylogenetic_Diversity, hembras_alfa$especies, exact=F)
 
-# by sex
+
+#### Diversidad alpha en flores macho ####
+head(div.df2)
+machos_alfa = subset(div.df2, sexo == "macho")
+str(machos_alfa)
+
+# data
+sort(machos_alfa$observed)
+machos_alfa$diversity_shannon
+machos_alfa$Phylogenetic_Diversity
+# Histograma
+hist(machos_alfa$observed)
+hist(machos_alfa$diversity_shannon) 
+hist(machos_alfa$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(machos_alfa$observed)
+shapiro.test(machos_alfa$diversity_shannon)
+shapiro.test(machos_alfa$Phylogenetic_Diversity)
+
+# Analysis with kruskal-Wallis and Wilcox text in male flowers #
 # Observed
-kruskal.test(div.df$observed~div.df$sexo)
-pairwise.wilcox.test(div.df$observed, div.df$sexo, exact=F)
+kruskal.test(machos_alfa$observed~machos_alfa$especies)
+pairwise.wilcox.test(machos_alfa$observed, machos_alfa$especies, exact=F)
 # shannon
-kruskal.test(div.df$diversity_shannon~div.df$sexo)
-pairwise.wilcox.test(div.df$diversity_shannon, div.df$sexo, exact=F)
+kruskal.test(machos_alfa$diversity_shannon~machos_alfa$especies)
+pairwise.wilcox.test(machos_alfa$diversity_shannon, machos_alfa$especies, exact=F)
 # PD
-kruskal.test(div.df$Phylogenetic_Diversity~div.df$sexo)
-pairwise.wilcox.test(div.df$Phylogenetic_Diversity, div.df$sexo, exact=F)
+kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
+pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
+                     exact=F)
 
 
 
@@ -1107,9 +1127,31 @@ compa6 = emmeans(mod6,
                  type = "response")
 compa6
 
-##### VISUALIZATION  OF ALPHA DIVERSITY with rarefied data####
-# Stripchart of observed ASVs with 1 panel
-ggplot(div.df2, aes(x=especies, y=observed, color=especies)) +
+##### VISUALIZATION  OF ALPHA DIVERSITY with proportion data####
+# Stripchart of observed ASVs of female flowers
+obs_hem <- ggplot(hembras_alfa, aes(x=especies, y=observed, color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_hembras.pdf", 
+       plot = obs_hem,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# Stripchart of observed ASVs of male flowers
+obs_machos <- ggplot(machos_alfa, aes(x=especies, y=observed, color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
@@ -1117,29 +1159,130 @@ ggplot(div.df2, aes(x=especies, y=observed, color=especies)) +
   scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
                             "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
   #                                                       "Visitadas")) +
-  theme_bw()
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_machos.pdf", 
+       plot = obs_machos,
+       width = 25, 
+       height = 20, 
+       units = "cm")
 
-### stripchart de Observed ASVs facet with 2 panels
-pro16_1 = ggplot(div.df2, aes(x=especies, y=observed, color=especies)) +
+# combinando plots
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+obs_pro <- grid.arrange(obs_hem, obs_machos, 
+                       ncol = 2, nrow = 1)
+
+obs_pro <- ggarrange(obs_hem, obs_machos, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("alpha_obser_nov06.pdf", 
+       plot = obs_pro,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+
+### stripchart de Shannon diversity index in female flowers
+sha_hem = ggplot(hembras_alfa, aes(x=especies, y=diversity_shannon,
+                                   color=especies)) +
   geom_boxplot()+
   geom_jitter(position=position_jitter(0.2), size = 1)+
   scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
+  labs(x="Species", y = "Shannon diversity index")+
   scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
                                   "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
                             "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
   #                                                       "Visitadas")) +
-  theme_bw()+
-  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+  theme_classic()
+sha_hem    
+  
+
+### stripchart de Shannon diversity index in male flowers
+sha_mac = ggplot(machos_alfa, aes(x=especies, y=diversity_shannon,
+                                   color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+sha_mac
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
 #stat_summary(fun=mean, geom="point", shape=18,
 #            size=6, color="red")
+sha_pro <- ggarrange(sha_hem, sha_mac, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("alpha_shan_nov06.pdf", 
+       plot = sha_pro,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+
+### stripchart de phylogenetic diversity index in female flowers
+pd_hem = ggplot(hembras_alfa, aes(x=especies, y=Phylogenetic_Diversity,
+                                   color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+pd_hem    
+
+
+### stripchart de Shannon diversity index in male flowers
+pd_mac = ggplot(machos_alfa, aes(x=especies, y=Phylogenetic_Diversity,
+                                  color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+pd_mac
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+pd_pro <- ggarrange(pd_hem, pd_mac, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("PD_shan_nov06.pdf", 
+       plot = pd_pro,
+       width = 25, 
+       height = 20, 
+       units = "cm")
 
 ### stripchart Shannon diversity index facet with 4 panels
 pro16_2 = ggplot(div.df2, aes(x=especies, y=diversity_shannon, color=especies))+ 
@@ -1189,14 +1332,9 @@ library(cowplot)
 gt_pro <- grid.arrange(pro16_1, pro16_2, pro16_3, 
                    ncol = 1, nrow = 3)
 
-
-
-head(div.df)
 ### gráfica del indice de Shannon entre especies y sexo
-pmult <- ggboxplot(div.df, x = "especies", y = "observed", alpha = .5,
-                   fill = "especies", add = "jitter", facet.by = "sexo",
-                   panel.labs = list(sexo = c("female",
-                                              "male")),
+pmult <- ggboxplot(hembras_alfa, x = "especies", y = "observed", alpha = .5,
+                   fill = "especies", add = "jitter",
                    short.panel.labs = FALSE)
 pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
 
@@ -1208,7 +1346,20 @@ labs(x = "Especies", y = "Índice de diversidad de Shannon")+
                             "3CPP" = "CPP", "4CAS" = "CAS",
                             "5CAA" = "CAA", "6CM" = "CM"))
 
+pmult + stat_compare_means()
 pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
+
+
+# create a list of pairwise comparisons
+spp <- base::levels(as.factor(hembras_alfa$especie)) # get the variables
+# make a pairwise list that we want to compare.
+spp.pairs <- combn(seq_along(spp), 2, simplify = FALSE, FUN = function(i)spp[i])
+print(spp.pairs)
+pmult <- pmult + stat_compare_means(comparisons = spp.pairs) 
+
+p2 <- p2 + stat_compare_means(comparisons = spp.pairs) 
+print(p2) # Wilcox test
+
 
 
 ########## BETA DIVERSITY  WITH PROPORTION DATA ##########

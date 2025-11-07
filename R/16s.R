@@ -1363,15 +1363,19 @@ print(p2) # Wilcox test
 
 
 ########## BETA DIVERSITY  WITH PROPORTION DATA ##########
-pseq_16s # proportion data
-s16_6 # phyloseq object filtered but no rarefied
 library(vegan)
-#### Unweighted UniFrac ####
+# phyloseq object filtered but no rarefied
+s16_6 
+# divided by sex
+hembras_pro
+machos_pro
+
+#### Unweighted UniFrac HEMBRAS ####
 # PCoA plot using the unweighted UniFrac as distance
-ordination_16s_pro = ordinate(s16_6, method="PCoA", "unifrac",
+ordination_16s_hem = ordinate(hembras_pro, method="PCoA", "unifrac",
                           weighted = F)
 
-baseplot_16s <- plot_ordination(s16_6, ordination_16s_pro,
+baseplot_16s_hem <- plot_ordination(hembras_pro, ordination_16s_hem,
                                 color="especies",
                                 type = "samples",
 ) + #shape = "sexo"
@@ -1379,50 +1383,61 @@ baseplot_16s <- plot_ordination(s16_6, ordination_16s_pro,
   theme(aspect.ratio=1)+
   theme_bw()+
   geom_point(size = 2)
-baseplot_16s
-#baseplot1 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-baseplot_16s +
-  geom_point(size = 2)+
-  ggtitle("")+
-  facet_wrap(~sexo, labeller = labeller(sexo = sexos))+
-  stat_ellipse()
+  #stat_ellipse()
 
-#### Weighted UniFrac ####
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_2_pro = ordinate(pseq_16s, method="PCoA", "wunifrac")
-# Plot
-baseplot_16s_2 <- plot_ordination(pseq_16s, ordination_16s_2_pro,
-                                  color="especies",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("Bacteria")+
+baseplot_16s_hem
+
+#baseplot_16s_hem +
+#  geom_point(size = 1)
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+#### Unweighted UniFrac MACHOS ####
+# PCoA plot using the unweighted UniFrac as distance
+ordination_16s_mac = ordinate(machos_pro, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_16s_mac <- plot_ordination(machos_pro, ordination_16s_mac,
+                                    color="especies",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 3)
+  geom_point(size = 2)
+  #stat_ellipse()
+baseplot_16s_mac
+
+
+#### Weighted UniFrac HEMBRAS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_hem_wei = ordinate(hembras_pro,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_hem_wei <- plot_ordination(hembras_pro, 
+                                        ordination_16s_hem_wei,
+                                  color="especies",
+                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
 #labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
 #scale_color_discrete(name = "Condition", 
 #                    labels = c("Domesticated","Wild"))+
 #scale_color_discrete(name = "Treatment",
 #                     labels = c("No-visited","Visited"))
 
-baseplot_16s_2
-#
-baseplot_16s_2 + stat_ellipse()
+baseplot_16s_hem_wei
+
+baseplot_16s_hem_wei + stat_ellipse()
 #
 #baseplot2 +
 #  geom_point(size = 1) +
 #  geom_label(aes(label = clave), size = 3.5, color = "black")
 #
-baseplot_16s_2 +
-  geom_point(size = 2)+
-  ggtitle("")+
-  facet_wrap(~sexo, labeller = labeller(sexo = sexos))+
-  stat_ellipse()
 
 #### PERMANOVA ####
-metadf = data.frame(sample_data(pseq_16s))
+metadf = data.frame(sample_data(s16_6))
 
 # calculating Weighted-UniFrac
 wunifrac.dist <- UniFrac(pseq_16s, 

@@ -1,9 +1,9 @@
 ### Análisis de las secuencias de 16s
 # Luis Alberto Villanueva Espino
 
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install("phyloseq")
+#if (!require("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+#BiocManager::install("phyloseq")
 
 
 # Cargando paquete phyloseq y paquetes adicionales
@@ -1371,11 +1371,17 @@ hembras_pro
 machos_pro
 
 #### Unweighted UniFrac HEMBRAS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s_hem <- transform(hembras_pro, "compositional")
+
+
 # PCoA plot using the unweighted UniFrac as distance
-ordination_16s_hem = ordinate(hembras_pro, method="PCoA", "unifrac",
+ordination_16s_hem = ordinate(pseq_16s_hem, method="PCoA", "unifrac",
                           weighted = F)
 
-baseplot_16s_hem <- plot_ordination(hembras_pro, ordination_16s_hem,
+baseplot_16s_hem <- plot_ordination(pseq_16s_hem, ordination_16s_hem,
                                 color="especies",
                                 type = "samples",
 ) + #shape = "sexo"
@@ -1392,11 +1398,16 @@ baseplot_16s_hem
 #  geom_label(aes(label = clave), size = 3.5, color = "black")
 
 #### Unweighted UniFrac MACHOS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s_mac <- transform(machos_pro, "compositional")
+
 # PCoA plot using the unweighted UniFrac as distance
-ordination_16s_mac = ordinate(machos_pro, method="PCoA", "unifrac",
+ordination_16s_mac = ordinate(pseq_16s_mac, method="PCoA", "unifrac",
                               weighted = F)
 
-baseplot_16s_mac <- plot_ordination(machos_pro, ordination_16s_mac,
+baseplot_16s_mac <- plot_ordination(pseq_16s_mac, ordination_16s_mac,
                                     color="especies",
                                     type = "samples",
 ) + #shape = "sexo"
@@ -1410,10 +1421,10 @@ baseplot_16s_mac
 
 #### Weighted UniFrac HEMBRAS####
 # PCoA plot using the weighted UniFrac as distance
-ordination_16s_hem_wei = ordinate(hembras_pro,
+ordination_16s_hem_wei = ordinate(pseq_16s_hem,
                                   method="PCoA", "wunifrac")
 # Plot
-baseplot_16s_hem_wei <- plot_ordination(hembras_pro, 
+baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem, 
                                         ordination_16s_hem_wei,
                                   color="especies",
                                   type = "samples") + #shape = "sexo" shape = "tratamiento"
@@ -1429,28 +1440,83 @@ baseplot_16s_hem_wei <- plot_ordination(hembras_pro,
 
 baseplot_16s_hem_wei
 
-baseplot_16s_hem_wei + stat_ellipse()
+#baseplot_16s_hem_wei + stat_ellipse()
 #
 #baseplot2 +
 #  geom_point(size = 1) +
 #  geom_label(aes(label = clave), size = 3.5, color = "black")
 #
 
-#### PERMANOVA ####
-metadf = data.frame(sample_data(s16_6))
+#### Weighted UniFrac MACHOS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_mac_wei = ordinate(pseq_16s_mac,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_mac_wei <- plot_ordination(pseq_16s_mac, 
+                                        ordination_16s_mac_wei,
+                                        color="especies",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_16s_mac_wei
+
+#baseplot_16s_mac_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+#### PERMANOVA by floral gender####
+## female flowers
+metadf_hem = data.frame(sample_data(hembras_pro))
 
 # calculating Weighted-UniFrac
-wunifrac.dist <- UniFrac(pseq_16s, 
+wunifrac.dist_hem <- UniFrac(pseq_16s_hem, 
                          weighted = TRUE, 
                          normalized = TRUE,  
                          parallel = FALSE, 
                          fast = TRUE)
+
+#Test dispersion among body sites
+disp_wun <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$especies)
+permutest(disp_wun)
+
 # Run PERMANOVA
 set.seed(100)   # Set the seed to make the analysis reproducible
-perm3 = adonis2(wunifrac.dist ~ especies*sexo, data = metadf,
+perm_hem = adonis2(wunifrac.dist_hem ~ especies, data = metadf_hem,
                 by = "terms", permutations = 999)
-perm3        
+perm_hem
 
+## Male flowers
+metadf_mac = data.frame(sample_data(machos_pro))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_mac <- UniFrac(pseq_16s_mac, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+#Test dispersion among body sites
+disp_wun_mac <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$especies)
+permutest(disp_wun_mac)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_mac = adonis2(wunifrac.dist_mac ~ especies, data = metadf_mac,
+                   by = "terms", permutations = 999)
+perm_mac
+
+
+###############################################################################
 # calculating Unweighted-UniFrac
 unifrac.dist <- UniFrac(pseq_16s, 
                         weighted = FALSE, 

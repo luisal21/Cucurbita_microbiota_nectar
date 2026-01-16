@@ -231,7 +231,819 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 
-                    #### METODOS DE NORMALIZACION ####
+###############################################################################
+#### ANALYSIS WITH PROPORTION DATA ####
+### Calculating relative abundances
+mergedGP_pro <- merge_samples(s16_6, "especies")
+# Use psmelt to obtain a long-format data.frame
+phy_pro <- mergedGP_pro %>% tax_glom(taxrank = "Family") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#View(phy_pro)
+#write.csv(phy_pro, file = "abundancias_family_propor.csv")
+
+#mergedtop = merge_samples(topfam, "especies")
+#phy2 <- mergedtop %>% tax_glom(taxrank = "Family") %>%
+#  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#View(phy2)
+
+#### HEATMAPs of most abundant bacteria ####
+### Collapse dataset taxonomy to 10 most abundant families
+topfam_pro <- aggregate_top_taxa2(s16_6, "Family", top = 10)
+#View(otu_table(topfam))
+topfam_pro
+
+# transform families dataset to relative abundance
+transform <- microbiome::transform
+famrel_pro <- transform(topfam_pro, "compositional")
+#View(otu_table(famrel))
+
+### Heatmap for 10 most abundant bacterial families between species
+heatmap_k_pro <- simple_heatmap(famrel_pro,
+                                group.facet = "especies",
+                                group.order = NULL,
+                                abund.thres = 0.01,
+                                prev.thres = 0.01,
+                                level = "Family",
+                                scale.color = "log10",
+                                na.fill = "white",
+                                color.fill = NULL,
+                                taxa.arrange=TRUE,
+                                remove.other=TRUE,
+                                panel.arrange="grid",
+                                ncol=NULL,
+                                nrow=NULL)
+heatmap_k_pro
+
+
+# Separando por sexos florales
+hembras_pro <- subset_samples(s16_6, sexo == "hembra")
+machos_pro <- subset_samples(s16_6, sexo == "macho")
+
+### Calculating relative abundances for Female flowers
+merged_hembras_pro <- merge_samples(hembras_pro, "especies")
+# Use psmelt to obtain a long-format data.frame
+phy_hembras_pro <- merged_hembras_pro %>% tax_glom(taxrank = "Family") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#View(phy_hembras_pro)
+#write.csv(phy_hembras_pro, file = "abundancias_hembras_pro.csv")
+
+### Calculating relative abundances for Male flowers
+merged_machos_pro <- merge_samples(machos_pro, "especies")
+# Use psmelt to obtain a long-format data.frame
+phy_machos_pro <- merged_machos_pro %>% tax_glom(taxrank = "Family") %>%
+  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#View(phy_machos_pro)
+#write.csv(phy_machos_pro, file = "abundancias_machos_pro.csv")
+
+
+# Flores hembra
+topfam_hempro <- aggregate_top_taxa2(hembras_pro, "Family", top = 10)
+# transform families dataset to relative abundance
+transform <- microbiome::transform
+famrel_hempro <- transform(topfam_hempro, "compositional")
+# Heatmap de flores hembra
+heatmap_hempro <- simple_heatmap(famrel_hempro,
+                                 group.facet = "especies",
+                                 group.order = NULL,
+                                 abund.thres = 0.01,
+                                 prev.thres = 0.01,
+                                 level = "Family",
+                                 scale.color = "log10",
+                                 na.fill = "white",
+                                 color.fill = NULL,
+                                 taxa.arrange=TRUE,
+                                 remove.other=TRUE,
+                                 panel.arrange="grid",
+                                 ncol=NULL,
+                                 nrow=NULL)
+heatmap_hempro
+
+# Flores machos
+topfam_macpro <- aggregate_top_taxa2(machos_pro, "Family", top = 10)
+# transform families dataset to relative abundance
+transform <- microbiome::transform
+famrel_macpro <- transform(topfam_macpro, "compositional")
+# Heatmap de flores hembra
+heatmap_macpro <- simple_heatmap(famrel_macpro,
+                                 group.facet = "especies",
+                                 group.order = NULL,
+                                 abund.thres = 0.01,
+                                 prev.thres = 0.01,
+                                 level = "Family",
+                                 scale.color = "log10",
+                                 na.fill = "white",
+                                 color.fill = NULL,
+                                 taxa.arrange=TRUE,
+                                 remove.other=TRUE,
+                                 panel.arrange="grid",
+                                 ncol=NULL,
+                                 nrow=NULL)
+heatmap_macpro
+
+### Arrange heatmaps in one graphic
+library(ggpubr)
+library(gridExtra)
+heatmaps <- grid.arrange(heatmap_hempro, heatmap_macpro, nrow = 2)
+
+# Most dominant families en todas las muestras
+domipro <- dominant_taxa(s16_6,level = "Family") #group = "especies"
+#View(domipro$dominant_overview)
+write.csv(domipro$dominant_overview, file = "dominant_overview_pro.csv")
+
+
+#### CORE MICROBIOTA ####
+
+# PREVALENCE OF TAXONOMIC GROUPS
+ps.relpro = microbiome::transform(s16_6, "compositional")
+# Relative population frequencies; at 1% compositional abundance threshold:
+head(prevalence(ps.relpro, detection = 10/100, sort = TRUE))
+# Absolute population frequencies (sample count)
+head(prevalence(ps.relpro, detection = 1/100, sort = TRUE, count = TRUE))
+
+# Core tresholds: minimum ASV relative abundance 0.001 % minimum prevalence
+# among samples 10%
+core.taxapro = core_members(ps.relpro, detection = .001, prevalence = .1,
+                            include.lowest = T)
+print(core.taxapro)
+# A full phyloseq object of the core microbiota is obtained as follows:
+full_corepro <- core(ps.relpro, detection = 0.001, prevalence = .1)
+View(tax_table(full_corepro))
+# Retrieving the core taxa names from the phyloseq object:
+core.taxa2 = taxa(full_corepro)
+
+# CORE ABUNDANCE AND DIVERSITY
+# total core abundance in each sample (sum of abundance of the core members):
+core.abundance <- sample_sums(core(ps.relpro, detection = .001, prevalence = .1))
+
+
+prevdf = apply(X = otu_table(s16_6),
+               MARGIN = ifelse(taxa_are_rows(s16_6), yes = 1, no = 2),
+               FUN = function(x){sum(x > 0)})
+
+# Add taxonomy and total read counts to this data.frame
+prevdf = data.frame(Prevalence = prevdf,
+                    TotalAbundance = taxa_sums(s16_6),
+                    tax_table(s16_6))
+# plotting prevalence
+table(prevdf$Prevalence)
+ggplot(prevdf, aes(Prevalence)) + geom_histogram(bins = 50) + theme_bw() + 
+  ggtitle("Histogram of Taxa Prevalence")
+
+View(head(otu_table(s16_6)))
+head(prevdf)
+
+# CORE VISUALIZATION
+# With compositional (relative) abundances
+det <- c(0, 0.1, 0.5, 2, 5, 20)/100
+prevalences <- seq(.05, 1, .05)
+#ggplot(d) + geom_point(aes(x, y)) + scale_x_continuous(trans="log10", limits=c(NA,1))
+
+plot_core(ps.rel, 
+          prevalences = prevalences, 
+          detections = det, 
+          plot.type = "lineplot") + 
+  xlab("Relative Abundance (%)")
+
+### CORE HEATMAPS
+library(RColorBrewer)
+library(reshape)
+
+prevalences <- seq(.05, 1, .05)
+
+detections <- round(10^seq(log10(0.01), log10(.2), length = 9), 3)
+
+# Also define gray color palette
+gray <- gray(seq(0,1,length=5))
+
+#Added pseq.rel, I thin... must be checked if it was in the the rednred version,; where it is initialized
+#pseq.rel<- microbiome::transform(pseq, 'compositional')
+#min-prevalence gets the 100th highest prevalence
+p <- plot_core(ps.rel,
+               plot.type = "heatmap", 
+               colours = gray,
+               prevalences = prevalences, 
+               detections = detections, 
+               min.prevalence = prevalence(ps.rel, sort = TRUE)[100]) +
+  labs(x = "Detection Threshold\n(Relative Abundance (%))") +
+  
+  #Adjusts axis text size and legend bar height
+  theme(axis.text.y= element_text(size=8, face="italic"),
+        axis.text.x.bottom=element_text(size=8),
+        axis.title = element_text(size=10),
+        legend.text = element_text(size=8),
+        legend.title = element_text(size=10))
+
+print(p)
+
+# Plotting with upsetR
+library(MicrobiotaProcess)
+library(UpSetR)
+
+
+uppenpro <- get_upset(s16_6, factorNames = "especies")
+View(uppenpro)
+# función para gráficar los ASVs compartidos entre especies
+?upset
+
+upset(uppenpro, nsets = 6, mainbar.y.label = "Number of ASVs shared",
+      order.by = "freq",
+      queries = list(list(query = intersects,
+                          params = list("6CM", "5CAA", "4CPP"),
+                          color = "orange",
+                          active = T),
+                     list(query = intersects,
+                          params = list("6CM", "5CAA", "4CPP", 
+                                        "3CAS", "2CPF", "1CF"),
+                          color = "green",
+                          active = T)))
+
+#list(query = intersects,
+#    params = list("3CAS", "2CPF", "1CF"),
+#   color = "pink",
+#  active = T)))
+#text.scale = 1.1, 
+#point.size = 2.8, 
+#line.size = 1
+
+
+
+
+###############################################################################
+#### ALPHA DIVERSITY WITH PROPORTIONS DATA  ####
+#### ANALYSIS WITH PROPORTIONS DATA ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s <- transform(s16_6, "compositional")
+
+
+library(knitr)
+
+# Obteniendo los valores de las metricas de diversidad alfa
+div2 = microbiome::alpha(pseq_16s, index = "all")
+kable(head(div2))
+View(div2)
+
+# get the metadata out as separate object
+ps2.meta <- meta(pseq_16s)
+kable(head(ps2.meta))
+# Add the rownames as a new colum for easy integration later.
+ps2.meta$sam_name2 <- rownames(ps2.meta)
+
+# Add the rownames to diversity table
+div2$sam_name2 <- rownames(div2)
+
+# merge these two data frames into one
+div.df2 <- merge(div2,ps2.meta, by = "sam_name2")
+
+# check the tables
+colnames(div.df2)
+
+### Phylogenetic diversity (Faith)
+library(picante)
+
+ps0.rar.asvtab2 <- as.data.frame(pseq_16s@otu_table)
+
+ps0.rar.tree2 <- pseq_16s@phy_tree
+
+# hmp.meta from previous code chunks
+
+# We first need to check if the tree is rooted or not 
+pseq_16s@phy_tree
+
+# it is a rooted tree
+df.pd2 <- pd(t(ps0.rar.asvtab2), ps0.rar.tree2,include.root=T) 
+# t(ou_table) transposes the table for use in picante and the tre file comes
+# from the first code chunck we used to read tree file (see making a phyloseq 
+# object section).
+#datatable(df.pd2)
+
+# We add the results of PD to this file and then plot
+div.df2$Phylogenetic_Diversity <- df.pd2$PD
+head(div.df2)
+
+
+#### Diversidad alpha en flores hembra ####
+head(div.df2)
+hembras_alfa = subset(div.df2, sexo == "hembra")
+str(hembras_alfa)
+
+# data
+sort(hembras_alfa$observed)
+hembras_alfa$diversity_shannon
+hembras_alfa$Phylogenetic_Diversity
+# Histograma
+hist(hembras_alfa$observed)
+hist(hembras_alfa$diversity_shannon) 
+hist(hembras_alfa$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(hembras_alfa$observed)
+shapiro.test(hembras_alfa$diversity_shannon)
+shapiro.test(hembras_alfa$Phylogenetic_Diversity)
+
+#### STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
+# Analysis with kruskal-Wallis and Wilcox text in female flowers #
+# Observed by species
+kruskal.test(hembras_alfa$observed~hembras_alfa$especies)
+pairwise.wilcox.test(hembras_alfa$observed, hembras_alfa$especies, exact=F)
+
+# shannon
+kruskal.test(hembras_alfa$diversity_shannon~hembras_alfa$especies)
+pairwise.wilcox.test(hembras_alfa$diversity_shannon, hembras_alfa$especies, exact=F)
+# PD
+kruskal.test(hembras_alfa$Phylogenetic_Diversity~hembras_alfa$especies)
+pairwise.wilcox.test(hembras_alfa$Phylogenetic_Diversity, hembras_alfa$especies, exact=F)
+
+
+#### Diversidad alpha en flores macho ####
+head(div.df2)
+machos_alfa = subset(div.df2, sexo == "macho")
+str(machos_alfa)
+
+# data
+sort(machos_alfa$observed)
+machos_alfa$diversity_shannon
+machos_alfa$Phylogenetic_Diversity
+# Histograma
+hist(machos_alfa$observed)
+hist(machos_alfa$diversity_shannon) 
+hist(machos_alfa$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(machos_alfa$observed)
+shapiro.test(machos_alfa$diversity_shannon)
+shapiro.test(machos_alfa$Phylogenetic_Diversity)
+
+# Analysis with kruskal-Wallis and Wilcox text in male flowers #
+# Observed
+kruskal.test(machos_alfa$observed~machos_alfa$especies)
+pairwise.wilcox.test(machos_alfa$observed, machos_alfa$especies, exact=F)
+# shannon
+kruskal.test(machos_alfa$diversity_shannon~machos_alfa$especies)
+pairwise.wilcox.test(machos_alfa$diversity_shannon, machos_alfa$especies, exact=F)
+# PD
+kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
+pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
+                     exact=F)
+
+
+### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
+library(emmeans)
+mean(div.df2$observed)
+var(div.df2$observed)
+# Richness
+mod4 = glm(observed ~ especies*sexo, data = div.df2,
+           family = quasipoisson)
+summary(mod4)
+anova(mod4)
+# post-hoc comparisons
+compa4 = emmeans(mod4, 
+                 specs = pairwise ~ especies | sexo, 
+                 type = "response")
+compa4
+compa4.1 = emmeans(mod4,
+                   specs = pairwise ~ especies,
+                   type = "response")
+compa4.1
+#write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
+
+# Shannon
+mod5 = glm(diversity_shannon ~ especies*sexo, data = div.df2)
+summary(mod5)
+anova(mod5)
+# post-hoc comparisons
+compa5 = emmeans(mod5, 
+                 specs = pairwise ~ especies | sexo, 
+                 type = "response")
+compa5
+#modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
+#summary(modx)
+
+# Phylogenetic Diversity index
+mod6 = glm(Phylogenetic_Diversity ~ especies*sexo, data = div.df2)
+summary(mod6)
+anova(mod6)
+# post-hoc comparisons
+compa6 = emmeans(mod6, 
+                 specs = pairwise ~ especies | sexo, 
+                 type = "response")
+compa6
+
+##### VISUALIZATION  OF ALPHA DIVERSITY WITH PROPORTION DATA####
+# Stripchart of observed ASVs of female flowers
+obs_hem <- ggplot(hembras_alfa, aes(x=especies, y=observed, color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_hembras.pdf", 
+       plot = obs_hem,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# Stripchart of observed ASVs of male flowers
+obs_machos <- ggplot(machos_alfa, aes(x=especies, y=observed, color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_machos.pdf", 
+       plot = obs_machos,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# combinando plots
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+obs_pro <- grid.arrange(obs_hem, obs_machos, 
+                        ncol = 2, nrow = 1)
+
+obs_pro <- ggarrange(obs_hem, obs_machos, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("alpha_obser_nov06.pdf", 
+       plot = obs_pro,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+### stripchart de Shannon diversity index in female flowers
+sha_hem = ggplot(hembras_alfa, aes(x=especies, y=diversity_shannon,
+                                   color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+sha_hem    
+
+
+### stripchart de Shannon diversity index in male flowers
+sha_mac = ggplot(machos_alfa, aes(x=especies, y=diversity_shannon,
+                                  color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+sha_mac
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+sha_pro <- ggarrange(sha_hem, sha_mac, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("alpha_shan_nov06.pdf", 
+       plot = sha_pro,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+
+### stripchart de phylogenetic diversity index in female flowers
+pd_hem = ggplot(hembras_alfa, aes(x=especies, y=Phylogenetic_Diversity,
+                                  color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+pd_hem    
+
+
+### stripchart de Shannon diversity index in male flowers
+pd_mac = ggplot(machos_alfa, aes(x=especies, y=Phylogenetic_Diversity,
+                                 color=especies)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 1)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+pd_mac
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+pd_pro <- ggarrange(pd_hem, pd_mac, ncol = 2, nrow = 1,
+                    labels = "AUTO") 
+# exporting plots
+ggsave("PD_shan_nov06.pdf", 
+       plot = pd_pro,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+### stripchart Shannon diversity index facet with 4 panels
+pro16_2 = ggplot(div.df2, aes(x=especies, y=diversity_shannon, color=especies))+ 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index",
+       title = "")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()+
+  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+# shannon_16s_1 = shannon_16s_1 + 
+#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+
+### stripchart phylogenetic diversity index facet with 2 panels
+pro16_3 = ggplot(div.df2, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+ 
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Phylogenetic Diversity index",
+       title = "")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_bw()+
+  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+# shannon_16s_1 = shannon_16s_1 + 
+#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
+
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+gt_pro <- grid.arrange(pro16_1, pro16_2, pro16_3, 
+                       ncol = 1, nrow = 3)
+
+### gráfica del indice de Shannon entre especies y sexo
+pmult <- ggboxplot(hembras_alfa, x = "especies", y = "observed", alpha = .5,
+                   fill = "especies", add = "jitter",
+                   short.panel.labs = FALSE)
+pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
+
+labs(x = "Especies", y = "Índice de diversidad de Shannon")+
+  scale_fill_discrete(name = "Especies") +
+  scale_fill_discrete(name = "Especies", 
+                      labels = c("CF","CPF","CPP","CAS", "CAA", "CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF",
+                            "3CPP" = "CPP", "4CAS" = "CAS",
+                            "5CAA" = "CAA", "6CM" = "CM"))
+
+pmult + stat_compare_means()
+pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
+
+
+# create a list of pairwise comparisons
+spp <- base::levels(as.factor(hembras_alfa$especie)) # get the variables
+# make a pairwise list that we want to compare.
+spp.pairs <- combn(seq_along(spp), 2, simplify = FALSE, FUN = function(i)spp[i])
+print(spp.pairs)
+pmult <- pmult + stat_compare_means(comparisons = spp.pairs) 
+
+p2 <- p2 + stat_compare_means(comparisons = spp.pairs) 
+print(p2) # Wilcox test
+
+
+########## BETA DIVERSITY  WITH PROPORTION DATA ##########
+library(vegan)
+# phyloseq object filtered but no rarefied
+s16_6 
+# divided by sex
+hembras_pro
+machos_pro
+
+#### Unweighted UniFrac HEMBRAS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s_hem <- transform(hembras_pro, "compositional")
+
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_16s_hem = ordinate(pseq_16s_hem, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_16s_hem <- plot_ordination(pseq_16s_hem, ordination_16s_hem,
+                                    color="especies",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#stat_ellipse()
+
+baseplot_16s_hem
+
+#baseplot_16s_hem +
+#  geom_point(size = 1)
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+#### Unweighted UniFrac MACHOS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s_mac <- transform(machos_pro, "compositional")
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_16s_mac = ordinate(pseq_16s_mac, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_16s_mac <- plot_ordination(pseq_16s_mac, ordination_16s_mac,
+                                    color="especies",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#stat_ellipse()
+baseplot_16s_mac
+
+
+#### Weighted UniFrac HEMBRAS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_hem_wei = ordinate(pseq_16s_hem,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem, 
+                                        ordination_16s_hem_wei,
+                                        color="especies",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_16s_hem_wei
+
+#baseplot_16s_hem_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+
+#### Weighted UniFrac MACHOS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_mac_wei = ordinate(pseq_16s_mac,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_mac_wei <- plot_ordination(pseq_16s_mac, 
+                                        ordination_16s_mac_wei,
+                                        color="especies",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_16s_mac_wei
+
+#baseplot_16s_mac_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+#### PERMANOVA by floral gender####
+## female flowers
+metadf_hem = data.frame(sample_data(hembras_pro))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_hem <- UniFrac(pseq_16s_hem, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+#Test dispersion among body sites
+disp_wun <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$especies)
+permutest(disp_wun)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_hem = adonis2(wunifrac.dist_hem ~ especies, data = metadf_hem,
+                   by = "terms", permutations = 999)
+perm_hem
+
+## Male flowers
+metadf_mac = data.frame(sample_data(machos_pro))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_mac <- UniFrac(pseq_16s_mac, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+#Test dispersion among body sites
+disp_wun_mac <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$especies)
+permutest(disp_wun_mac)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_mac = adonis2(wunifrac.dist_mac ~ especies, data = metadf_mac,
+                   by = "terms", permutations = 999)
+perm_mac
+
+
+###############################################################################
+# calculating Unweighted-UniFrac
+unifrac.dist <- UniFrac(pseq_16s, 
+                        weighted = FALSE, 
+                        normalized = TRUE,  
+                        parallel = FALSE, 
+                        fast = TRUE)
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm4 = adonis2(unifrac.dist ~ especies*sexo, data = metadf,
+                by = "terms", permutations = 999)
+perm4  
+
+?betadisper
+ps.disper <- betadisper(unifrac.dist, metadf$especies)
+permutest(ps.disper, pairwise = TRUE)
+anova(ps.disper)
+TukeyHSD(ps.disper)
+
+
+
+
+
+
+
+
+
+
+####################### METODOS DE NORMALIZACION ##############################
                          #### RAREFIED DATA ####
 otu_tab = t(abundances(s16_6))
 p = vegan::rarecurve(otu_tab,
@@ -967,825 +1779,6 @@ upset(uppen, nsets = 6, mainbar.y.label = "Number of ASVs shared",
 
 ###############################################################################
 ###############################################################################
-                  #### ANALYSIS WITH PROPORTIONS DATA ####
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-transform <- microbiome::transform
-# Proportion Normalization
-pseq_16s <- transform(s16_6, "compositional")
-
-#### ALPHA DIVERSITY WITH PROPORTIONS DATA  ####
-library(knitr)
-
-# Obteniendo los valores de las metricas de diversidad alfa
-div2 = microbiome::alpha(pseq_16s, index = "all")
-kable(head(div2))
-View(div2)
-
-# get the metadata out as separate object
-ps2.meta <- meta(pseq_16s)
-kable(head(ps2.meta))
-# Add the rownames as a new colum for easy integration later.
-ps2.meta$sam_name2 <- rownames(ps2.meta)
-
-# Add the rownames to diversity table
-div2$sam_name2 <- rownames(div2)
-
-# merge these two data frames into one
-div.df2 <- merge(div2,ps2.meta, by = "sam_name2")
-
-# check the tables
-colnames(div.df2)
-
-### Phylogenetic diversity (Faith)
-library(picante)
-
-ps0.rar.asvtab2 <- as.data.frame(pseq_16s@otu_table)
-
-ps0.rar.tree2 <- pseq_16s@phy_tree
-
-# hmp.meta from previous code chunks
-
-# We first need to check if the tree is rooted or not 
-pseq_16s@phy_tree
-
-# it is a rooted tree
-df.pd2 <- pd(t(ps0.rar.asvtab2), ps0.rar.tree2,include.root=T) 
-# t(ou_table) transposes the table for use in picante and the tre file comes
-# from the first code chunck we used to read tree file (see making a phyloseq 
-# object section).
-#datatable(df.pd2)
-
-# We add the results of PD to this file and then plot
-div.df2$Phylogenetic_Diversity <- df.pd2$PD
-head(div.df2)
-
-
-#### Diversidad alpha en flores hembra ####
-head(div.df2)
-hembras_alfa = subset(div.df2, sexo == "hembra")
-str(hembras_alfa)
-
-# data
-sort(hembras_alfa$observed)
-hembras_alfa$diversity_shannon
-hembras_alfa$Phylogenetic_Diversity
-# Histograma
-hist(hembras_alfa$observed)
-hist(hembras_alfa$diversity_shannon) 
-hist(hembras_alfa$Phylogenetic_Diversity)
-# Shapiro test
-shapiro.test(hembras_alfa$observed)
-shapiro.test(hembras_alfa$diversity_shannon)
-shapiro.test(hembras_alfa$Phylogenetic_Diversity)
-
-#### STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
-# Analysis with kruskal-Wallis and Wilcox text in female flowers #
-# Observed by species
-kruskal.test(hembras_alfa$observed~hembras_alfa$especies)
-pairwise.wilcox.test(hembras_alfa$observed, hembras_alfa$especies, exact=F)
-
-# shannon
-kruskal.test(hembras_alfa$diversity_shannon~hembras_alfa$especies)
-pairwise.wilcox.test(hembras_alfa$diversity_shannon, hembras_alfa$especies, exact=F)
-# PD
-kruskal.test(hembras_alfa$Phylogenetic_Diversity~hembras_alfa$especies)
-pairwise.wilcox.test(hembras_alfa$Phylogenetic_Diversity, hembras_alfa$especies, exact=F)
-
-
-#### Diversidad alpha en flores macho ####
-head(div.df2)
-machos_alfa = subset(div.df2, sexo == "macho")
-str(machos_alfa)
-
-# data
-sort(machos_alfa$observed)
-machos_alfa$diversity_shannon
-machos_alfa$Phylogenetic_Diversity
-# Histograma
-hist(machos_alfa$observed)
-hist(machos_alfa$diversity_shannon) 
-hist(machos_alfa$Phylogenetic_Diversity)
-# Shapiro test
-shapiro.test(machos_alfa$observed)
-shapiro.test(machos_alfa$diversity_shannon)
-shapiro.test(machos_alfa$Phylogenetic_Diversity)
-
-# Analysis with kruskal-Wallis and Wilcox text in male flowers #
-# Observed
-kruskal.test(machos_alfa$observed~machos_alfa$especies)
-pairwise.wilcox.test(machos_alfa$observed, machos_alfa$especies, exact=F)
-# shannon
-kruskal.test(machos_alfa$diversity_shannon~machos_alfa$especies)
-pairwise.wilcox.test(machos_alfa$diversity_shannon, machos_alfa$especies, exact=F)
-# PD
-kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
-pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
-                     exact=F)
-
-
-
-
-### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
-library(emmeans)
-mean(div.df2$observed)
-var(div.df2$observed)
-# Richness
-mod4 = glm(observed ~ especies*sexo, data = div.df2,
-           family = quasipoisson)
-summary(mod4)
-anova(mod4)
-# post-hoc comparisons
-compa4 = emmeans(mod4, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
-compa4
-compa4.1 = emmeans(mod4,
-                   specs = pairwise ~ especies,
-                   type = "response")
-compa4.1
-#write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
-
-# Shannon
-mod5 = glm(diversity_shannon ~ especies*sexo, data = div.df2)
-summary(mod5)
-anova(mod5)
-# post-hoc comparisons
-compa5 = emmeans(mod5, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
-compa5
-#modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
-#summary(modx)
-
-# Phylogenetic Diversity index
-mod6 = glm(Phylogenetic_Diversity ~ especies*sexo, data = div.df2)
-summary(mod6)
-anova(mod6)
-# post-hoc comparisons
-compa6 = emmeans(mod6, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
-compa6
-
-##### VISUALIZATION  OF ALPHA DIVERSITY with proportion data####
-# Stripchart of observed ASVs of female flowers
-obs_hem <- ggplot(hembras_alfa, aes(x=especies, y=observed, color=especies)) +
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 2)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  #theme_bw()
-  theme_classic()
-#Exportamos grafico de alfa div (observed) a pdf
-ggsave("observed_hembras.pdf", 
-       plot = obs_hem,
-       width = 25, 
-       height = 20, 
-       units = "cm")
-
-# Stripchart of observed ASVs of male flowers
-obs_machos <- ggplot(machos_alfa, aes(x=especies, y=observed, color=especies)) +
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 2)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Richness")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  #theme_bw()
-  theme_classic()
-#Exportamos grafico de alfa div (observed) a pdf
-ggsave("observed_machos.pdf", 
-       plot = obs_machos,
-       width = 25, 
-       height = 20, 
-       units = "cm")
-
-# combinando plots
-# cargando paqueteria gridExtra
-library(gridExtra)
-library(cowplot)
-obs_pro <- grid.arrange(obs_hem, obs_machos, 
-                       ncol = 2, nrow = 1)
-
-obs_pro <- ggarrange(obs_hem, obs_machos, ncol = 2, nrow = 1,
-                     labels = "AUTO") 
-# exporting plots
-ggsave("alpha_obser_nov06.pdf", 
-       plot = obs_pro,
-       width = 25, 
-       height = 20, 
-       units = "cm")
-
-
-### stripchart de Shannon diversity index in female flowers
-sha_hem = ggplot(hembras_alfa, aes(x=especies, y=diversity_shannon,
-                                   color=especies)) +
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 1)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_classic()
-sha_hem    
-  
-
-### stripchart de Shannon diversity index in male flowers
-sha_mac = ggplot(machos_alfa, aes(x=especies, y=diversity_shannon,
-                                   color=especies)) +
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 1)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_classic()
-sha_mac
-
-#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
-#stat_summary(fun=mean, geom="point", shape=18,
-#            size=6, color="red")
-sha_pro <- ggarrange(sha_hem, sha_mac, ncol = 2, nrow = 1,
-                     labels = "AUTO") 
-# exporting plots
-ggsave("alpha_shan_nov06.pdf", 
-       plot = sha_pro,
-       width = 25, 
-       height = 20, 
-       units = "cm")
-
-
-### stripchart de phylogenetic diversity index in female flowers
-pd_hem = ggplot(hembras_alfa, aes(x=especies, y=Phylogenetic_Diversity,
-                                   color=especies)) +
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 1)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_classic()
-pd_hem    
-
-
-### stripchart de Shannon diversity index in male flowers
-pd_mac = ggplot(machos_alfa, aes(x=especies, y=Phylogenetic_Diversity,
-                                  color=especies)) +
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 1)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_classic()
-pd_mac
-
-#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
-#stat_summary(fun=mean, geom="point", shape=18,
-#            size=6, color="red")
-pd_pro <- ggarrange(pd_hem, pd_mac, ncol = 2, nrow = 1,
-                     labels = "AUTO") 
-# exporting plots
-ggsave("PD_shan_nov06.pdf", 
-       plot = pd_pro,
-       width = 25, 
-       height = 20, 
-       units = "cm")
-
-### stripchart Shannon diversity index facet with 4 panels
-pro16_2 = ggplot(div.df2, aes(x=especies, y=diversity_shannon, color=especies))+ 
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 2)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Shannon diversity index",
-       title = "")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_bw()+
-  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
-#stat_summary(fun=mean, geom="point", shape=18,
-#            size=6, color="red")
-# shannon_16s_1 = shannon_16s_1 + 
-#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
-
-### stripchart phylogenetic diversity index facet with 2 panels
-pro16_3 = ggplot(div.df2, aes(x=especies, y=Phylogenetic_Diversity, color=especies))+ 
-  geom_boxplot()+
-  geom_jitter(position=position_jitter(0.2), size = 2)+
-  scale_shape_manual(values=c(1,19))+
-  labs(x="Species", y = "Phylogenetic Diversity index",
-       title = "")+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
-  #                                                       "Visitadas")) +
-  theme_bw()+
-  facet_wrap(~sexo, labeller = labeller(sexo = sexos))
-#stat_summary(fun=mean, geom="point", shape=18,
-#            size=6, color="red")
-# shannon_16s_1 = shannon_16s_1 + 
-#stat_compare_means(method = "wilcox.test", label.x = 1.5, label.y = 3)
-
-# cargando paqueteria gridExtra
-library(gridExtra)
-library(cowplot)
-gt_pro <- grid.arrange(pro16_1, pro16_2, pro16_3, 
-                   ncol = 1, nrow = 3)
-
-### gráfica del indice de Shannon entre especies y sexo
-pmult <- ggboxplot(hembras_alfa, x = "especies", y = "observed", alpha = .5,
-                   fill = "especies", add = "jitter",
-                   short.panel.labs = FALSE)
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-labs(x = "Especies", y = "Índice de diversidad de Shannon")+
-  scale_fill_discrete(name = "Especies") +
-  scale_fill_discrete(name = "Especies", 
-                      labels = c("CF","CPF","CPP","CAS", "CAA", "CM"))+
-  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF",
-                            "3CPP" = "CPP", "4CAS" = "CAS",
-                            "5CAA" = "CAA", "6CM" = "CM"))
-
-pmult + stat_compare_means()
-pmult + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
-
-
-# create a list of pairwise comparisons
-spp <- base::levels(as.factor(hembras_alfa$especie)) # get the variables
-# make a pairwise list that we want to compare.
-spp.pairs <- combn(seq_along(spp), 2, simplify = FALSE, FUN = function(i)spp[i])
-print(spp.pairs)
-pmult <- pmult + stat_compare_means(comparisons = spp.pairs) 
-
-p2 <- p2 + stat_compare_means(comparisons = spp.pairs) 
-print(p2) # Wilcox test
-
-
-
-########## BETA DIVERSITY  WITH PROPORTION DATA ##########
-library(vegan)
-# phyloseq object filtered but no rarefied
-s16_6 
-# divided by sex
-hembras_pro
-machos_pro
-
-#### Unweighted UniFrac HEMBRAS ####
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-transform <- microbiome::transform
-# Proportion Normalization
-pseq_16s_hem <- transform(hembras_pro, "compositional")
-
-
-# PCoA plot using the unweighted UniFrac as distance
-ordination_16s_hem = ordinate(pseq_16s_hem, method="PCoA", "unifrac",
-                          weighted = F)
-
-baseplot_16s_hem <- plot_ordination(pseq_16s_hem, ordination_16s_hem,
-                                color="especies",
-                                type = "samples",
-) + #shape = "sexo"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 2)
-  #stat_ellipse()
-
-baseplot_16s_hem
-
-#baseplot_16s_hem +
-#  geom_point(size = 1)
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-
-#### Unweighted UniFrac MACHOS ####
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-transform <- microbiome::transform
-# Proportion Normalization
-pseq_16s_mac <- transform(machos_pro, "compositional")
-
-# PCoA plot using the unweighted UniFrac as distance
-ordination_16s_mac = ordinate(pseq_16s_mac, method="PCoA", "unifrac",
-                              weighted = F)
-
-baseplot_16s_mac <- plot_ordination(pseq_16s_mac, ordination_16s_mac,
-                                    color="especies",
-                                    type = "samples",
-) + #shape = "sexo"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 2)
-  #stat_ellipse()
-baseplot_16s_mac
-
-
-#### Weighted UniFrac HEMBRAS####
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_hem_wei = ordinate(pseq_16s_hem,
-                                  method="PCoA", "wunifrac")
-# Plot
-baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem, 
-                                        ordination_16s_hem_wei,
-                                  color="especies",
-                                  type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 2)
-#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-#scale_color_discrete(name = "Condition", 
-#                    labels = c("Domesticated","Wild"))+
-#scale_color_discrete(name = "Treatment",
-#                     labels = c("No-visited","Visited"))
-
-baseplot_16s_hem_wei
-
-#baseplot_16s_hem_wei + stat_ellipse()
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-
-#### Weighted UniFrac MACHOS####
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_mac_wei = ordinate(pseq_16s_mac,
-                                  method="PCoA", "wunifrac")
-# Plot
-baseplot_16s_mac_wei <- plot_ordination(pseq_16s_mac, 
-                                        ordination_16s_mac_wei,
-                                        color="especies",
-                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 2)
-#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-#scale_color_discrete(name = "Condition", 
-#                    labels = c("Domesticated","Wild"))+
-#scale_color_discrete(name = "Treatment",
-#                     labels = c("No-visited","Visited"))
-
-baseplot_16s_mac_wei
-
-#baseplot_16s_mac_wei + stat_ellipse()
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-#### PERMANOVA by floral gender####
-## female flowers
-metadf_hem = data.frame(sample_data(hembras_pro))
-
-# calculating Weighted-UniFrac
-wunifrac.dist_hem <- UniFrac(pseq_16s_hem, 
-                         weighted = TRUE, 
-                         normalized = TRUE,  
-                         parallel = FALSE, 
-                         fast = TRUE)
-
-#Test dispersion among body sites
-disp_wun <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$especies)
-permutest(disp_wun)
-
-# Run PERMANOVA
-set.seed(100)   # Set the seed to make the analysis reproducible
-perm_hem = adonis2(wunifrac.dist_hem ~ especies, data = metadf_hem,
-                by = "terms", permutations = 999)
-perm_hem
-
-## Male flowers
-metadf_mac = data.frame(sample_data(machos_pro))
-
-# calculating Weighted-UniFrac
-wunifrac.dist_mac <- UniFrac(pseq_16s_mac, 
-                             weighted = TRUE, 
-                             normalized = TRUE,  
-                             parallel = FALSE, 
-                             fast = TRUE)
-
-#Test dispersion among body sites
-disp_wun_mac <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$especies)
-permutest(disp_wun_mac)
-
-# Run PERMANOVA
-set.seed(100)   # Set the seed to make the analysis reproducible
-perm_mac = adonis2(wunifrac.dist_mac ~ especies, data = metadf_mac,
-                   by = "terms", permutations = 999)
-perm_mac
-
-
-###############################################################################
-# calculating Unweighted-UniFrac
-unifrac.dist <- UniFrac(pseq_16s, 
-                        weighted = FALSE, 
-                        normalized = TRUE,  
-                        parallel = FALSE, 
-                        fast = TRUE)
-# Run PERMANOVA
-set.seed(100)   # Set the seed to make the analysis reproducible
-perm4 = adonis2(unifrac.dist ~ especies*sexo, data = metadf,
-                by = "terms", permutations = 999)
-perm4  
-
-?betadisper
-ps.disper <- betadisper(unifrac.dist, metadf$especies)
-permutest(ps.disper, pairwise = TRUE)
-anova(ps.disper)
-TukeyHSD(ps.disper)
-
-
-
-#### ANALYSIS WITH PROPORTION DATA ####
-### Calculating relative abundances
-mergedGP_pro <- merge_samples(s16_6, "especies")
-# Use psmelt to obtain a long-format data.frame
-phy_pro <- mergedGP_pro %>% tax_glom(taxrank = "Family") %>%
-  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-#View(phy_pro)
-#write.csv(phy_pro, file = "abundancias_family_propor.csv")
-
-#mergedtop = merge_samples(topfam, "especies")
-#phy2 <- mergedtop %>% tax_glom(taxrank = "Family") %>%
-#  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-#View(phy2)
-
-#### HEATMAPs of most abundant bacteria ####
-### Collapse dataset taxonomy to 10 most abundant families
-topfam_pro <- aggregate_top_taxa2(s16_6, "Family", top = 10)
-#View(otu_table(topfam))
-topfam_pro
-
-# transform families dataset to relative abundance
-transform <- microbiome::transform
-famrel_pro <- transform(topfam_pro, "compositional")
-#View(otu_table(famrel))
-
-### Heatmap for 10 most abundant bacterial families between species
-heatmap_k_pro <- simple_heatmap(famrel_pro,
-                            group.facet = "especies",
-                            group.order = NULL,
-                            abund.thres = 0.01,
-                            prev.thres = 0.01,
-                            level = "Family",
-                            scale.color = "log10",
-                            na.fill = "white",
-                            color.fill = NULL,
-                            taxa.arrange=TRUE,
-                            remove.other=TRUE,
-                            panel.arrange="grid",
-                            ncol=NULL,
-                            nrow=NULL)
-heatmap_k_pro
-
-
-# Separando por sexos florales
-hembras_pro <- subset_samples(s16_6, sexo == "hembra")
-machos_pro <- subset_samples(s16_6, sexo == "macho")
-
-### Calculating relative abundances for Female flowers
-merged_hembras_pro <- merge_samples(hembras_pro, "especies")
-# Use psmelt to obtain a long-format data.frame
-phy_hembras_pro <- merged_hembras_pro %>% tax_glom(taxrank = "Family") %>%
-  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-#View(phy_hembras_pro)
-#write.csv(phy_hembras_pro, file = "abundancias_hembras_pro.csv")
-
-### Calculating relative abundances for Male flowers
-merged_machos_pro <- merge_samples(machos_pro, "especies")
-# Use psmelt to obtain a long-format data.frame
-phy_machos_pro <- merged_machos_pro %>% tax_glom(taxrank = "Family") %>%
-  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-#View(phy_machos_pro)
-#write.csv(phy_machos_pro, file = "abundancias_machos_pro.csv")
-
-
-# Flores hembra
-topfam_hempro <- aggregate_top_taxa2(hembras_pro, "Family", top = 10)
-# transform families dataset to relative abundance
-transform <- microbiome::transform
-famrel_hempro <- transform(topfam_hempro, "compositional")
-# Heatmap de flores hembra
-heatmap_hempro <- simple_heatmap(famrel_hempro,
-                              group.facet = "especies",
-                              group.order = NULL,
-                              abund.thres = 0.01,
-                              prev.thres = 0.01,
-                              level = "Family",
-                              scale.color = "log10",
-                              na.fill = "white",
-                              color.fill = NULL,
-                              taxa.arrange=TRUE,
-                              remove.other=TRUE,
-                              panel.arrange="grid",
-                              ncol=NULL,
-                              nrow=NULL)
-heatmap_hempro
-
-# Flores machos
-topfam_macpro <- aggregate_top_taxa2(machos_pro, "Family", top = 10)
-# transform families dataset to relative abundance
-transform <- microbiome::transform
-famrel_macpro <- transform(topfam_macpro, "compositional")
-# Heatmap de flores hembra
-heatmap_macpro <- simple_heatmap(famrel_macpro,
-                              group.facet = "especies",
-                              group.order = NULL,
-                              abund.thres = 0.01,
-                              prev.thres = 0.01,
-                              level = "Family",
-                              scale.color = "log10",
-                              na.fill = "white",
-                              color.fill = NULL,
-                              taxa.arrange=TRUE,
-                              remove.other=TRUE,
-                              panel.arrange="grid",
-                              ncol=NULL,
-                              nrow=NULL)
-heatmap_macpro
-
-### Arrange heatmaps in one graphic
-library(ggpubr)
-library(gridExtra)
-heatmaps <- grid.arrange(heatmap_hempro, heatmap_macpro, nrow = 2)
-
-# Most dominant families en todas las muestras
-domipro <- dominant_taxa(s16_6,level = "Family") #group = "especies"
-#View(domipro$dominant_overview)
-write.csv(domipro$dominant_overview, file = "dominant_overview_pro.csv")
-
-
-#### CORE MICROBIOTA ####
-
-# PREVALENCE OF TAXONOMIC GROUPS
-ps.relpro = microbiome::transform(s16_6, "compositional")
-# Relative population frequencies; at 1% compositional abundance threshold:
-head(prevalence(ps.relpro, detection = 10/100, sort = TRUE))
-# Absolute population frequencies (sample count)
-head(prevalence(ps.relpro, detection = 1/100, sort = TRUE, count = TRUE))
-
-# Core tresholds: minimum ASV relative abundance 0.001 % minimum prevalence
-# among samples 10%
-core.taxapro = core_members(ps.relpro, detection = .001, prevalence = .1,
-                         include.lowest = T)
-print(core.taxapro)
-# A full phyloseq object of the core microbiota is obtained as follows:
-full_corepro <- core(ps.relpro, detection = 0.001, prevalence = .1)
-View(tax_table(full_corepro))
-# Retrieving the core taxa names from the phyloseq object:
-core.taxa2 = taxa(full_corepro)
-
-# CORE ABUNDANCE AND DIVERSITY
-# total core abundance in each sample (sum of abundance of the core members):
-core.abundance <- sample_sums(core(ps.relpro, detection = .001, prevalence = .1))
-
-
-prevdf = apply(X = otu_table(s16_6),
-               MARGIN = ifelse(taxa_are_rows(s16_6), yes = 1, no = 2),
-               FUN = function(x){sum(x > 0)})
-
-# Add taxonomy and total read counts to this data.frame
-prevdf = data.frame(Prevalence = prevdf,
-                    TotalAbundance = taxa_sums(s16_6),
-                    tax_table(s16_6))
-# plotting prevalence
-table(prevdf$Prevalence)
-ggplot(prevdf, aes(Prevalence)) + geom_histogram(bins = 50) + theme_bw() + 
-  ggtitle("Histogram of Taxa Prevalence")
-
-View(head(otu_table(s16_6)))
-head(prevdf)
-
-# CORE VISUALIZATION
-# With compositional (relative) abundances
-det <- c(0, 0.1, 0.5, 2, 5, 20)/100
-prevalences <- seq(.05, 1, .05)
-#ggplot(d) + geom_point(aes(x, y)) + scale_x_continuous(trans="log10", limits=c(NA,1))
-
-plot_core(ps.rel, 
-          prevalences = prevalences, 
-          detections = det, 
-          plot.type = "lineplot") + 
-  xlab("Relative Abundance (%)")
-
-### CORE HEATMAPS
-library(RColorBrewer)
-library(reshape)
-
-prevalences <- seq(.05, 1, .05)
-
-detections <- round(10^seq(log10(0.01), log10(.2), length = 9), 3)
-
-# Also define gray color palette
-gray <- gray(seq(0,1,length=5))
-
-#Added pseq.rel, I thin... must be checked if it was in the the rednred version,; where it is initialized
-#pseq.rel<- microbiome::transform(pseq, 'compositional')
-#min-prevalence gets the 100th highest prevalence
-p <- plot_core(ps.rel,
-               plot.type = "heatmap", 
-               colours = gray,
-               prevalences = prevalences, 
-               detections = detections, 
-               min.prevalence = prevalence(ps.rel, sort = TRUE)[100]) +
-  labs(x = "Detection Threshold\n(Relative Abundance (%))") +
-  
-  #Adjusts axis text size and legend bar height
-  theme(axis.text.y= element_text(size=8, face="italic"),
-        axis.text.x.bottom=element_text(size=8),
-        axis.title = element_text(size=10),
-        legend.text = element_text(size=8),
-        legend.title = element_text(size=10))
-
-print(p)
-
-# Plotting with upsetR
-library(MicrobiotaProcess)
-library(UpSetR)
-
-
-uppenpro <- get_upset(s16_6, factorNames = "especies")
-View(uppenpro)
-# función para gráficar los ASVs compartidos entre especies
-?upset
-
-upset(uppenpro, nsets = 6, mainbar.y.label = "Number of ASVs shared",
-      order.by = "freq",
-      queries = list(list(query = intersects,
-                          params = list("6CM", "5CAA", "4CPP"),
-                          color = "orange",
-                          active = T),
-                     list(query = intersects,
-                          params = list("6CM", "5CAA", "4CPP", 
-                                        "3CAS", "2CPF", "1CF"),
-                          color = "green",
-                          active = T)))
-
-#list(query = intersects,
-#    params = list("3CAS", "2CPF", "1CF"),
-#   color = "pink",
-#  active = T)))
-#text.scale = 1.1, 
-#point.size = 2.8, 
-#line.size = 1
-
-
-
-
-
-
-                 
-
-
-
-
-
-
-
-
-       
-###############################################################################
 library(ggalluvial)
 library(pals)
 
@@ -1890,92 +1883,6 @@ mycols <- c(nonCRC="#d6e2e9", CRC="#cbf3f0", H="#fcf5c7")
 plot(venn(list_core),
      fills = mycols)
 ###############################################################################
-###############################################################################
-###############################################################################
-### Código que sobra
-##### DESeq2 #### No correr por ahora
-# install package
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-BiocManager::install("DESeq2")
-
-library(DESeq2)
-
-kostic <- prune_samples(sample_sums(its5) > 10, its5)
-kostic
-
-sample_data(kostic)$condicion <- as.factor(sample_data(kostic)$condicion)
-
-# Convert to DESeq2 object
-DESeq2_Object <- phyloseq_to_deseq2(kostic, ~ condicion)
-#> converting counts to integer mode
-#> Warning in DESeqDataSet(se, design = design, ignoreRank): some variables in
-#> design formula are characters, converting to factors
-
-# calculate geometric means prior to estimate size factors
-gm_mean = function(x, na.rm=TRUE){
-  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
-}
-geoMeans = apply(counts(DESeq2_Object), 1, gm_mean)
-DESeq2_dds = estimateSizeFactors(DESeq2_Object, geoMeans = geoMeans)
-DESeq2_dds = DESeq(DESeq2_dds, fitType="local")
-#> using pre-existing size factors
-#> estimating dispersions
-#> gene-wise dispersion estimates
-#> mean-dispersion relationship
-#> final dispersion estimates
-#> fitting model and testing
-
-# Explore results
-res = results(DESeq2_dds)
-res = res[order(res$padj, na.last=NA), ]
-alpha = 0.01
-sigtab = res[(res$padj < alpha), ]
-sigtab = cbind(as(sigtab, "data.frame"),
-               as(tax_table(kostic)[rownames(sigtab), ], "matrix"))
-head(sigtab)
-
-posigtab = sigtab[sigtab[, "log2FoldChange"] > 0, ]
-posigtab = posigtab[, c("baseMean", "log2FoldChange", "lfcSE", "padj",
-                        "Phylum", "Class", "Family", "Genus")]
 
 
-
-#### NORMALIZATION METHODS ####
-# Proportion Normalization
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-# Paquete microbiome
-transform <- microbiome::transform
-s16_prop <- transform(s16_6, "compositional")
-otu_table(s16_prop)[1:10, 1:10]
-head(sample_sums(s16_prop))
-
-### Abundance value transformation
-plot_abundance = function(physeq,title = "",
-                          Facet = "Order", Color = "Phylum"){
-  # Arbitrary subset, based on Phylum, for plotting
-  p1f = subset_taxa(physeq, Phylum %in% c("Bacteroidota"))
-  mphyseq = psmelt(p1f)
-  mphyseq <- subset(mphyseq, Abundance > 0)
-  ggplot(data = mphyseq, mapping = aes_string(x = "sexo",y = "Abundance",
-                                              color = Color, fill = Color)) +
-    geom_violin(fill = NA) +
-    geom_point(size = 1, alpha = 0.3,
-               position = position_jitter(width = 0.3)) +
-    facet_wrap(facets = Facet) + scale_y_log10()+
-    theme(legend.position="none")
-}
-
-# Transform to relative abundance. Save as new object.
-ps3ra = transform_sample_counts(s16_6, function(x){x / sum(x)})
-
-#Now plot the abundance values before and after transformation.
-plotBefore = plot_abundance(s16_6,"")
-plotAfter = plot_abundance(ps3ra,"")
-# Combine each plot into one graphic.
-grid.arrange(nrow = 2, plotBefore, plotAfter)
-
-
-write.csv(otu_table(s16_prop), file = "prop_16s.csv") 
 

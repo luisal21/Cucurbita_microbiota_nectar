@@ -364,8 +364,7 @@ write.csv(taxa.print, file = "taxa_fungi_all_8.csv")
 
 #### Analysis post-taxonomic assignation
 ### change directory
-setwd("/home/luis/Documents/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
-
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq); packageVersion("phyloseq")
@@ -507,9 +506,14 @@ plot_bar(its6, fill = "Phylum") +
   geom_bar(aes(color = Phylum), stat = "identity",
            position = "stack")
 # abundancia total de secuencias a nivel de Order
-plot_bar(its6, fill = "Class") +
-  geom_bar(aes(color = Class), stat = "identity",
+plot_bar(its6, fill = "Order") +
+  geom_bar(aes(color = Order), stat = "identity",
            position = "stack")
+# abundancia total de secuencias a nivel de Order
+plot_bar(its6, fill = "Family") +
+  geom_bar(aes(color = Family), stat = "identity",
+           position = "stack")
+
 # Abundancia relativa a nivel de Phylum
 plot_bar(ps_rel_abund, fill = "Phylum") +
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
@@ -602,6 +606,8 @@ abundances(rare.its10)
 ### TAXA PREVALENCE
 plot_taxa_prevalence(its6, "Class")
 plot_taxa_prevalence(rare.its10, "Class")
+
+
 
            #### ALPHA DIVERSITY WITHOUT RAREFIED DATA  ####
 library(knitr)
@@ -949,7 +955,7 @@ heatmap_its <- simple_heatmap(famrel_its,
                                 level = "Family",
                                 scale.color = "log10",
                                 na.fill = "white",
-                                color.fill = heat.cols,
+                                color.fill = NULL,
                                 taxa.arrange=TRUE,
                                 remove.other=TRUE,
                                 panel.arrange="grid",
@@ -993,7 +999,7 @@ heatmap_hemits <- simple_heatmap(famrel_hemits,
                                  level = "Family",
                                  scale.color = "log10",
                                  na.fill = "white",
-                                 color.fill = heat.cols,
+                                 color.fill = NULL,
                                  taxa.arrange=TRUE,
                                  remove.other=TRUE,
                                  panel.arrange="grid",
@@ -1015,7 +1021,7 @@ heatmap_macits <- simple_heatmap(famrel_macits,
                                  level = "Family",
                                  scale.color = "log10",
                                  na.fill = "white",
-                                 color.fill = heat.cols,
+                                 color.fill = NULL,
                                  taxa.arrange=TRUE,
                                  remove.other=TRUE,
                                  panel.arrange="grid",

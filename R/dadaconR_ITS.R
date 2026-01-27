@@ -813,93 +813,452 @@ upset(uppenpro, nsets = 6, mainbar.y.label = "Number of ASVs shared",
 
 
 ###############################################################################
-### funciones del paquete microbiome para calcular diversidad alpha
+#### ALPHA DIVERSITY WITH PROPORTIONS DATA  ####
+#### ANALYSIS WITH PROPORTIONS DATA ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_its <- transform(its6, "compositional")
+
 library(knitr)
 
 # Obteniendo los valores de las metricas de diversidad alfa
-div1 = microbiome::alpha(ps.rarefied, index = "all")
-kable(head(div1))
-
-tab <- microbiome::alpha(ps.rarefied, index = c("observed","shannon", "simpson",
-                                                "absolute", "low_abundance",
-                                                "rare_abundance"));tab
+alpha_its = microbiome::alpha(its6, index = "all")
+tab <- microbiome::alpha(its6, index = c("observed","shannon", "simpson"));tab
 kable(head(tab))
+View(tab)
 
-#metadatos
-ps1.meta <- meta(ps.rarefied)
-kable(head(ps1.meta))
+# get the metadata out as separate object
+its.meta <- meta(its6)
+kable(head(its.meta))
+# Add the rownames as a new colum for easy integration later.
+its.meta$sam_name2 <- rownames(its.meta)
+
+# Add the rownames to diversity table
+tab$sam_name2 <- rownames(tab)
+
+# merge these two data frames into one
+div.df3 <- merge(tab,its.meta, by = "sam_name2")
+
+# check the tables
+colnames(div.df3)
+
+### Phylogenetic diversity (Faith)
+library(picante)
+
+ps0.rar.asvtab3 <- as.data.frame(its6@otu_table)
+
+ps0.rar.tree3 <- its6@phy_tree
+
+# hmp.meta from previous code chunks
+
+# We first need to check if the tree is rooted or not 
+its6@phy_tree
+
+# it is a rooted tree
+df.pd3 <- pd(t(ps0.rar.asvtab3), ps0.rar.tree3,include.root=T) 
+# t(ou_table) transposes the table for use in picante and the tre file comes
+# from the first code chunck we used to read tree file (see making a phyloseq 
+# object section).
+#datatable(df.pd2)
+
+# We add the results of PD to this file and then plot
+div.df3$Phylogenetic_Diversity <- df.pd3$PD
+head(div.df3)
+
+#### Diversidad alpha en flores hembra ####
+head(div.df3)
+hembras_alfa_its = subset(div.df3, sexo == "hembra")
+str(hembras_alfa_its)
+
+# data
+sort(hembras_alfa_its$observed)
+hembras_alfa_its$diversity_shannon
+hembras_alfa_its$Phylogenetic_Diversity
+# Histograma
+hist(hembras_alfa_its$observed)
+hist(hembras_alfa_its$diversity_shannon) 
+hist(hembras_alfa_its$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(hembras_alfa_its$observed)
+shapiro.test(hembras_alfa_its$diversity_shannon)
+shapiro.test(hembras_alfa_its$Phylogenetic_Diversity)
 
 
-#Add the diversity table to metadata
-ps1.meta$Shannon <- tab$diversity_shannon 
-ps1.meta$observed <- tab$observed
-ps1.meta$even_simp <- tab$evenness_simpson
-ps1.meta$dom_simp <- tab$dominance_simpson
-ps1.meta$dom_abs <- tab$dominance_absolute
-ps1.meta$low <- tab$rarity_low_abundance
-ps1.meta$rare <- tab$rarity_rare_abundance
-head(ps1.meta)
-ps1.meta$observed
-ps1.meta$dom_abs
-subset(ps1.meta, select = c("observed", "dom_abs", "low", "rare"))
+#### STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
+# Analysis with kruskal-Wallis and Wilcox text in female flowers #
+# Observed by species
+kruskal.test(hembras_alfa_its$observed~hembras_alfa_its$especie)
+pairwise.wilcox.test(hembras_alfa_its$observed, hembras_alfa_its$especie,
+                     exact=F)
 
-hist(tab$diversity_shannon) 
-hist(tab$observed)
-hist(tab$evenness_simpson)
-hist(tab$dominance_simpson)
-hist(tab$dominance_absolute)
-
-shapiro.test(ps1.meta$Shannon)
-shapiro.test(ps1.meta$observed)
-shapiro.test(ps1.meta$even_simp)
-shapiro.test(ps1.meta$dom_simp)
-shapiro.test(ps1.meta$dom_abs)
-length(ps1.meta$Shannon)
-
-#ps1.meta2 <- subset(ps1.meta, Shannon != 0)
-#str(ps1.meta2)
-#head(ps1.meta2)
-#hist(ps1.meta2$Shannon)
-#shapiro.test(ps1.meta2$Shannon)
-
-# Riqueza
-tab <- richness(ps.rarefied)
-kable(head(tab))
-levels(as.factor(ps1.meta$especie))
-
-# Dominancia
-tab <- dominance(ps.rarefied, index = "all")
-kable(head(tab))
-tab$absolute
-
-# Most dominant
-dominant(ps.rarefied)
-
-# rarity
-tab <- rarity(ps.rarefied, index = "all")
-kable(head(tab))
-hist(tab$low_abundance)
-hist(tab$rare_abundance)
-tab$low_abundance
+# shannon
+kruskal.test(hembras_alfa_its$diversity_shannon~hembras_alfa_its$especie)
+pairwise.wilcox.test(hembras_alfa_its$diversity_shannon,
+                     hembras_alfa_its$especie, exact=F)
+# PD
+kruskal.test(hembras_alfa_its$Phylogenetic_Diversity~hembras_alfa_its$especie)
+pairwise.wilcox.test(hembras_alfa_its$Phylogenetic_Diversity,
+                     hembras_alfa_its$especie, exact=F)
 
 
-######## Calculando diversidad alpha con estimate_richness
-rich = estimate_richness(ps.rarefied, measures = c("Observed", "Chao1", "ACE",
-                                                   "Shannon", "Simpson",
-                                                   "InvSimpson"))
-head(rich)
+#### Diversidad alpha en flores macho ####
+head(div.df3)
+machos_alfa_its = subset(div.df3, sexo == "macho")
+str(machos_alfa_its)
+
+# data
+sort(machos_alfa_its$observed)
+machos_alfa_its$diversity_shannon
+machos_alfa_its$Phylogenetic_Diversity
+# Histograma
+hist(machos_alfa_its$observed)
+hist(machos_alfa_its$diversity_shannon) 
+hist(machos_alfa_its$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(machos_alfa_its$observed)
+shapiro.test(machos_alfa_its$diversity_shannon)
+shapiro.test(machos_alfa_its$Phylogenetic_Diversity)
+
+# Analysis with kruskal-Wallis and Wilcox text in male flowers #
+# Observed
+kruskal.test(machos_alfa_its$observed~machos_alfa_its$especie)
+pairwise.wilcox.test(machos_alfa_its$observed, 
+                     machos_alfa_its$especie, exact=F)
+# shannon
+kruskal.test(machos_alfa_its$diversity_shannon~machos_alfa_its$especie)
+pairwise.wilcox.test(machos_alfa_its$diversity_shannon,
+                     machos_alfa_its$especie, exact=F)
+# PD
+kruskal.test(machos_alfa_its$Phylogenetic_Diversity~machos_alfa_its$especie)
+pairwise.wilcox.test(machos_alfa_its$Phylogenetic_Diversity,
+                     machos_alfa_its$especie, exact=F)
+
+##### VISUALIZATION  OF ALPHA DIVERSITY WITH PROPORTION DATA####
+# Stripchart of observed ASVs of female flowers
+obs_hem_its <- ggplot(hembras_alfa_its, aes(x=especie, y=observed,
+                                            color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_hembras_its.pdf", 
+       plot = obs_hem_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# Stripchart of observed ASVs of Male flowers
+obs_machos_its <- ggplot(machos_alfa_its, aes(x=especie, y=observed,
+                                              color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_machos_its.pdf", 
+       plot = obs_machos_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# combinando plots
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+obs_pro_its <- grid.arrange(obs_hem_its, obs_machos_its, 
+                        ncol = 2, nrow = 1)
+
+obs_pro_its <- ggarrange(obs_hem_its, obs_machos_its, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("alpha_obser_its_ene26.pdf", 
+       plot = obs_pro_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+
+### stripchart de Shannon diversity index in female flowers
+sha_hem_its = ggplot(hembras_alfa_its, aes(x=especie, y=diversity_shannon,
+                                   color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+sha_hem_its    
+
+
+### stripchart de Shannon diversity index in male flowers
+sha_mac_its = ggplot(machos_alfa_its, aes(x=especie, y=diversity_shannon,
+                                  color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+sha_mac_its
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+sha_pro_its <- ggarrange(sha_hem_its, sha_mac_its, ncol = 2, nrow = 1,
+                     labels = "AUTO") 
+# exporting plots
+ggsave("alpha_shan_its_nov06.pdf", 
+       plot = sha_pro_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+### stripchart de Phylogenetic Diversity index in female flowers
+pd_hem_its = ggplot(hembras_alfa_its, aes(x=especie, y=Phylogenetic_Diversity,
+                                  color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+pd_hem_its    
+
+
+### stripchart de Shannon diversity index in male flowers
+pd_mac_its = ggplot(machos_alfa_its, aes(x=especie, y=Phylogenetic_Diversity,
+                                 color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+pd_mac_its
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+pd_pro_its <- ggarrange(pd_hem_its, pd_mac_its, ncol = 2, nrow = 1,
+                    labels = "AUTO") 
+# exporting plots
+ggsave("PD_shan_its_nov06.pdf", 
+       plot = pd_pro_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+###############################################################################
+############################## BETA DIVERSITY #################################
+library(vegan)
+# phyloseq object filtered but no rarefied
+its6
+# divided by sex
+hembras_its
+machos_its
+
+#### Unweighted UniFrac HEMBRAS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+its_hem <- transform(hembras_its, "compositional")
+
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_its_hem = ordinate(its_hem, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_its_hem <- plot_ordination(its_hem, ordination_its_hem,
+                                    color="especie",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#stat_ellipse()
+
+baseplot_its_hem
+
+#baseplot_16s_hem +
+#  geom_point(size = 1)
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+
+#### Unweighted UniFrac MACHOS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+its_mac <- transform(machos_its, "compositional")
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_its_mac = ordinate(its_mac, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_its_mac <- plot_ordination(its_mac, ordination_its_mac,
+                                    color="especie",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#stat_ellipse()
+baseplot_its_mac
+
+
+#### Weighted UniFrac HEMBRAS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_its_hem_wei = ordinate(its_hem,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_its_hem_wei <- plot_ordination(its_hem, 
+                                        ordination_its_hem_wei,
+                                        color="especie",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_its_hem_wei
+
+#baseplot_16s_hem_wei + stat_ellipse()
 #
-pairwise.wilcox.test(rich$Observed, sample_data(ps.rarefied)$condicion)
-pairwise.wilcox.test(rich$Shannon, sample_data(ps.rarefied)$condicion)
-pairwise.wilcox.test(rich$Observed, sample_data(ps.rarefied)$especie)
-pairwise.wilcox.test(rich$Shannon, sample_data(ps.rarefied)$especie)
-pairwise.wilcox.test(rich$Observed, sample_data(ps.rarefied)$sexo)
-pairwise.wilcox.test(rich$Shannon, sample_data(ps.rarefied)$sexo)
-pairwise.wilcox.test(rich$Observed, sample_data(ps.rarefied)$tratamiento)
-pairwise.wilcox.test(rich$Shannon, sample_data(ps.rarefied)$tratamiento)
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+
+#### Weighted UniFrac MACHOS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_its_mac_wei = ordinate(its_mac,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_its_mac_wei <- plot_ordination(its_mac, 
+                                        ordination_its_mac_wei,
+                                        color="especie",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_its_mac_wei
+
+#baseplot_16s_mac_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
 
 
-# BETA DIVERSITY
+#### PERMANOVA by floral gender####
+## female flowers
+metadf_hem_its = data.frame(sample_data(hembras_its))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_its_hem <- UniFrac(its_hem, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+#Test dispersion among body sites
+disp_wun_its <- betadisper(wunifrac.dist_its_hem,
+                           sample_data(hembras_its)$especie)
+permutest(disp_wun_its)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_hem_its = adonis2(wunifrac.dist_its_hem ~ especie, data = metadf_hem_its,
+                   by = "terms", permutations = 999)
+perm_hem_its
+
+## Male flowers
+metadf_mac_its = data.frame(sample_data(machos_its))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_its_mac <- UniFrac(its_mac, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+#Test dispersion among body sites
+disp_wun_mac_its <- betadisper(wunifrac.dist_its_mac,
+                               sample_data(machos_its)$especie)
+permutest(disp_wun_mac_its)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_mac_its = adonis2(wunifrac.dist_its_mac ~ especie, data = metadf_mac_its,
+                   by = "terms", permutations = 999)
+perm_mac_its
+
+
+
+
+
+
+
+
+
+
 # PCoA plot using the unweighted UniFrac as distance
 wunifrac_dist = phyloseq::distance(ps.rarefied, method="unifrac", weighted=F)
 ordination = ordinate(ps.rarefied, method="PCoA", distance=wunifrac_dist)

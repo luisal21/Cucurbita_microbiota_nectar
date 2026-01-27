@@ -972,7 +972,8 @@ baseplot_16s_mac_wei
 #baseplot2 +
 #  geom_point(size = 1) +
 #  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
+
+
 #### PERMANOVA by floral gender####
 ## female flowers
 metadf_hem = data.frame(sample_data(hembras_pro))

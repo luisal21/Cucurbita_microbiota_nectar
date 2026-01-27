@@ -1172,7 +1172,7 @@ baseplot_its_hem_wei <- plot_ordination(its_hem,
 
 baseplot_its_hem_wei
 
-#baseplot_16s_hem_wei + stat_ellipse()
+baseplot_its_hem_wei + stat_ellipse()
 #
 #baseplot2 +
 #  geom_point(size = 1) +
@@ -1200,7 +1200,7 @@ baseplot_its_mac_wei <- plot_ordination(its_mac,
 
 baseplot_its_mac_wei
 
-#baseplot_16s_mac_wei + stat_ellipse()
+baseplot_its_mac_wei + stat_ellipse()
 #
 #baseplot2 +
 #  geom_point(size = 1) +

@@ -728,14 +728,14 @@ ggsave("alpha_obser_nov06.pdf",
 #### stripchart de Shannon diversity index in female flowers
 sha_hem = ggplot(hembras_alfa, aes(x=especies, y=diversity_shannon,
                                    fill=condicion)) +
-  geom_boxplot()+
+  geom_boxplot(alpha = 0.8)+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
   labs(x="Species", y = "Shannon diversity index")+
   scale_fill_discrete(name = "Condition", 
                        labels = c("domesticada" = "Domesticated",
                                   "silvestre" = "Wild"),
-                      palette = c("#D9B38C","#6B734D"))+
+                      palette = c("#E6AB02","#4D9221"))+
   scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
                             "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
@@ -744,17 +744,20 @@ sha_hem = ggplot(hembras_alfa, aes(x=especies, y=diversity_shannon,
 
 sha_hem    
 
+#display.brewer.pal(n = 8, name = 'Greens')
+#brewer.pal(n = 8, name = "PiYG")
 
 ### stripchart de Shannon diversity index in male flowers
 sha_mac = ggplot(machos_alfa, aes(x=especies, y=diversity_shannon,
-                                  color=condicion)) +
-  geom_boxplot()+
+                                  fill=condicion)) +
+  geom_boxplot(alpha = 0.8)+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
   labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Condition", 
+  scale_fill_discrete(name = "Condition", 
                        labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))+
+                                  "silvestre" = "Wild"),
+                                  palette = c("#E6AB02","#4D9221"))+
   scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
                             "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
@@ -983,13 +986,15 @@ baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem,
   ggtitle("")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 5)+
+  geom_point(size = 4)+
   scale_color_discrete(name = "Species", 
                        labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
   scale_shape_discrete(name = "Condition",
                        labels = c("domesticada" = "Domesticated",
                                   "silvestre" = "Wild"))
+  #scale_shape_manual(values=c(16,3))
 #labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
 #scale_color_discrete(name = "Condition", 
 #                    labels = c("Domesticated","Wild"))+
@@ -997,6 +1002,7 @@ baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem,
 #                     labels = c("No-visited","Visited"))
 
 baseplot_16s_hem_wei
+#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
 
 #baseplot_16s_hem_wei + stat_ellipse()
 #
@@ -1004,6 +1010,13 @@ baseplot_16s_hem_wei
 #  geom_point(size = 1) +
 #  geom_label(aes(label = clave), size = 3.5, color = "black")
 #
+#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
+#wei_16s
+#+ coord_fixed()
+
+#+ stat_ellipse(type = "t")
+#baseplot_16s_hem_wei + stat_ellipse(type = "t")
+
 
 #### Weighted UniFrac MACHOS####
 # PCoA plot using the weighted UniFrac as distance
@@ -1018,10 +1031,11 @@ baseplot_16s_mac_wei <- plot_ordination(pseq_16s_mac,
   ggtitle("")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 5)+
+  geom_point(size = 4)+
   scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
   scale_shape_discrete(name = "Condition",
                        labels = c("domesticada" = "Domesticated",
                                   "silvestre" = "Wild"))

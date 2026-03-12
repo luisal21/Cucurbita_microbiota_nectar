@@ -1029,14 +1029,15 @@ ggsave("alpha_obser_its_ene26.pdf",
 
 ### stripchart de Shannon diversity index in female flowers
 sha_hem_its = ggplot(hembras_alfa_its, aes(x=especie, y=diversity_shannon,
-                                   color=condicion)) +
-  geom_boxplot()+
+                                   fill=condicion)) +
+  geom_boxplot(alpha = 0.8)+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
   labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Condition", 
+  scale_fill_discrete(name = "Condition", 
                        labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))+
+                                  "silvestre" = "Wild"),
+                       palette = c("#E6AB02","#4D9221"))+
   scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
                             "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
@@ -1047,14 +1048,15 @@ sha_hem_its
 
 ### stripchart de Shannon diversity index in male flowers
 sha_mac_its = ggplot(machos_alfa_its, aes(x=especie, y=diversity_shannon,
-                                  color=condicion)) +
-  geom_boxplot()+
+                                  fill=condicion)) +
+  geom_boxplot(alpha = 0.8)+
   geom_jitter(position=position_jitter(0.2), size = 2)+
   scale_shape_manual(values=c(1,19))+
   labs(x="Species", y = "Shannon diversity index")+
-  scale_color_discrete(name = "Condition", 
+  scale_fill_discrete(name = "Condition", 
                        labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))+
+                                  "silvestre" = "Wild"),
+                       palette = c("#E6AB02","#4D9221"))+
   scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
                             "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
   #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
@@ -1198,10 +1200,11 @@ baseplot_its_hem_wei <- plot_ordination(its_hem,
   ggtitle("")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 5)+
+  geom_point(size = 4)+
   scale_color_discrete(name = "Species", 
                        labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
   scale_shape_discrete(name = "Condition",
                        labels = c("domesticada" = "Domesticated",
                                   "silvestre" = "Wild"))
@@ -1233,10 +1236,11 @@ baseplot_its_mac_wei <- plot_ordination(its_mac,
   ggtitle("")+
   theme(aspect.ratio=1)+
   theme_bw()+
-  geom_point(size = 5)+
+  geom_point(size = 4)+
   scale_color_discrete(name = "Species", 
                        labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
   scale_shape_discrete(name = "Condition",
                        labels = c("domesticada" = "Domesticated",
                                   "silvestre" = "Wild"))
@@ -1323,6 +1327,8 @@ perm_mac_its
 wunifrac_dist = phyloseq::distance(ps.rarefied, method="unifrac", weighted=F)
 ordination = ordinate(ps.rarefied, method="PCoA", distance=wunifrac_dist)
 plot_ordination(ps.rarefied, ordination, color="especie") + theme(aspect.ratio=1)
+
+
 # PERMANOVA
 adonis(wunifrac_dist ~ sample_data(ps.rarefied)$especie)
 ########

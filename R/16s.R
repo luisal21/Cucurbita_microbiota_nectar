@@ -262,6 +262,7 @@ topfam_pro
 # transform families dataset to relative abundance
 transform <- microbiome::transform
 famrel_pro <- transform(topfam_pro, "compositional")
+View(otu_table(famrel_pro))
 #View(otu_table(famrel))
 
 ### Heatmap for 10 most abundant bacterial families between species
@@ -560,8 +561,16 @@ kruskal.test(hembras_alfa$observed~hembras_alfa$especies)
 pairwise.wilcox.test(hembras_alfa$observed, hembras_alfa$especies, exact=F)
 
 # shannon
+kruskal.test(hembras_alfa$diversity_shannon~hembras_alfa$condicion)
+pairwise.wilcox.test(hembras_alfa$diversity_shannon,
+                     hembras_alfa$condicion, exact=F)
+
 kruskal.test(hembras_alfa$diversity_shannon~hembras_alfa$especies)
-pairwise.wilcox.test(hembras_alfa$diversity_shannon, hembras_alfa$especies, exact=F)
+pairwise.wilcox.test(hembras_alfa$diversity_shannon,
+                     hembras_alfa$especies, exact=F)
+
+
+
 # PD
 kruskal.test(hembras_alfa$Phylogenetic_Diversity~hembras_alfa$especies)
 pairwise.wilcox.test(hembras_alfa$Phylogenetic_Diversity, hembras_alfa$especies, exact=F)
@@ -601,8 +610,15 @@ shapiro.test(machos_alfa$Phylogenetic_Diversity)
 kruskal.test(machos_alfa$observed~machos_alfa$especies)
 pairwise.wilcox.test(machos_alfa$observed, machos_alfa$especies, exact=F)
 # shannon
+kruskal.test(machos_alfa$diversity_shannon~machos_alfa$condicion)
+pairwise.wilcox.test(machos_alfa$diversity_shannon,
+                     machos_alfa$condicion, exact=F)
+
 kruskal.test(machos_alfa$diversity_shannon~machos_alfa$especies)
-pairwise.wilcox.test(machos_alfa$diversity_shannon, machos_alfa$especies, exact=F)
+pairwise.wilcox.test(machos_alfa$diversity_shannon,
+                     machos_alfa$especies, exact=F)
+
+
 # PD
 kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
 pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,

@@ -589,6 +589,7 @@ topfam_its
 # transform families dataset to relative abundance
 transform <- microbiome::transform
 famrel_its <- transform(topfam_its, "compositional")
+View(otu_table(famrel_its))
 #View(otu_table(famrel))
 
 ### Heatmap for 10 most abundant bacterial families between species
@@ -692,7 +693,7 @@ ggsave("heatmaps_june.pdf",
        units = "cm")
 
 # Most dominant families en todas las muestras
-domiits <- dominant_taxa(its6, level = "Family") #group = "especies"
+domiits <- dominant_taxa(its7, level = "Family") #group = "especies"
 View(domiits$dominant_overview)
 write.csv(domiits$dominant_overview, file = "dominant_overview_its.csv")
 
@@ -906,13 +907,13 @@ pairwise.wilcox.test(hembras_alfa_its$observed, hembras_alfa_its$especie,
                      exact=F)
 
 # shannon
-kruskal.test(hembras_alfa_its$diversity_shannon~hembras_alfa_its$especie)
-pairwise.wilcox.test(hembras_alfa_its$diversity_shannon,
-                     hembras_alfa_its$especie, exact=F)
-
 kruskal.test(hembras_alfa_its$diversity_shannon~hembras_alfa_its$condicion)
 pairwise.wilcox.test(hembras_alfa_its$diversity_shannon,
                      hembras_alfa_its$condicion, exact=F)
+
+kruskal.test(hembras_alfa_its$diversity_shannon~hembras_alfa_its$especie)
+pairwise.wilcox.test(hembras_alfa_its$diversity_shannon,
+                     hembras_alfa_its$especie, exact=F)
 
 # PD
 kruskal.test(hembras_alfa_its$Phylogenetic_Diversity~hembras_alfa_its$especie)
@@ -947,15 +948,14 @@ shapiro.test(machos_alfa_its$Phylogenetic_Diversity)
 kruskal.test(machos_alfa_its$observed~machos_alfa_its$especie)
 pairwise.wilcox.test(machos_alfa_its$observed, 
                      machos_alfa_its$especie, exact=F)
-# shannon
-kruskal.test(machos_alfa_its$diversity_shannon~machos_alfa_its$especie)
-pairwise.wilcox.test(machos_alfa_its$diversity_shannon,
-                     machos_alfa_its$especie, exact=F)
-
-# shannon
+# shannon - especies
 kruskal.test(machos_alfa_its$diversity_shannon~machos_alfa_its$condicion)
 pairwise.wilcox.test(machos_alfa_its$diversity_shannon,
                      machos_alfa_its$condicion, exact=F)
+# shannon - condicion
+kruskal.test(machos_alfa_its$diversity_shannon~machos_alfa_its$especie)
+
+
 
 # PD
 kruskal.test(machos_alfa_its$Phylogenetic_Diversity~machos_alfa_its$especie)

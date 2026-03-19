@@ -1,12 +1,12 @@
-### Análisis de las secuencias de 16s
-# Luis Alberto Villanueva Espino
+################### Análisis de las secuencias de 16s #########################
+##### Luis Alberto Villanueva Espino
+#### Marzo 2026
 
 #if (!require("BiocManager", quietly = TRUE))
 #  install.packages("BiocManager")
 #BiocManager::install("phyloseq")
 
-
-# Cargando paquete phyloseq y paquetes adicionales
+#### Cargando paquete phyloseq y paquetes adicionales ####
 library(phyloseq)
 library(ggplot2)
 #library(VennDiagram) # no instalado
@@ -33,10 +33,8 @@ library(Hmisc)
 library(stats4)
 #library(patchwork) # no instalado
 
-
 #### Set up directory in which the databases are located ####
 setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
-
 
 ### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
 # deshabilitar este codigo
@@ -171,7 +169,6 @@ filterPhyla = c("Euryarchaeota", "FCPU426", "RCP2-54",
 s16_4 = subset_taxa(s16_3, !Phylum %in% filterPhyla)
 s16_4 # Final ASV data set: 4106 ASVs in 227 samples
 
-
 # Filtering samples of Morelia site
 s16_5 = subset_samples(s16_4, sitio=="morelia")
 summarize_phyloseq(s16_5)  #9,453,658 reads, 4106 ASVs
@@ -231,11 +228,14 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 ###############################################################################
+#### ANALISIS DE COMPOSICIÓN TAXONÓMICA DE BACTERIAS SEPARADAS POR SEXO FLORAL 
+
 # Separando por sexos florales
 hembras_pro <- subset_samples(s16_6, sexo == "hembra")
 machos_pro <- subset_samples(s16_6, sexo == "macho")
 
-###### HEMBRAS ####
+##### HEMBRAS ####
+#### Obteniendo las abundancias relativas por especie
 # 1. Preparación del objeto Phyloseq
 # A. Aglomerar a nivel de Familia. Esto suma los reads de todos los ASVs/OTUs
 # que pertenecen a la misma familia. Reduce la complejidad drásticamente.
@@ -269,7 +269,7 @@ df_final <- df_grouped %>%
             by = c("especies", "Family")) %>%
   # Si la familia NO estaba en el top10 (Classification es NA), la llamamos "Otras"
   dplyr::mutate(Taxonomy_Display = ifelse(is.na(Classification), 
-                                   "Otras", 
+                                   "Other", 
                                    as.character(Family))) %>%
   # Volvemos a agrupar y sumar para colapsar todas las "Otras" en una sola fila por especie
   dplyr::group_by(especies, Taxonomy_Display) %>%
@@ -277,17 +277,17 @@ df_final <- df_grouped %>%
   # Convertir abundancia relativa (0-1) a porcentaje (0-100) para el gráfico
   dplyr::mutate(Percentage = TotalMeanAbund * 100)
 View(df_final)
-write.csv(df_final, file = "abundancias_family_hembras_marzo2026.csv")
+#write.csv(df_final, file = "abundancias_family_hembras_marzo2026_10.csv")
 
 # 3. Preparación para Graficar
 # ==============================================================================
 
 # G. Ordenar los factores para que "Otras" siempre aparezca abajo en la barra y leyenda.
 # Primero obtenemos todos los nombres únicos excepto "Otras" y los ordenamos alfabéticamente
-taxa_names <- sort(setdiff(unique(df_final$Taxonomy_Display), "Otras"))
+taxa_names <- sort(setdiff(unique(df_final$Taxonomy_Display), "Other"))
 # Creamos el factor con "Otras" al final
 df_final$Taxonomy_Display <- factor(df_final$Taxonomy_Display, 
-                                    levels = c(taxa_names, "Otras"))
+                                    levels = c(taxa_names, "Other"))
 
 # H. Definir una paleta de colores. El Top 10 por especie puede generar
 # fácilmente entre 15 y 30 familias únicas en total para graficar.
@@ -298,7 +298,7 @@ custom_colors <- getPalette(n_colors)
 
 # Asignar explícitamente el color gris a "Otras"
 names(custom_colors) <- levels(df_final$Taxonomy_Display)
-custom_colors["Otras"] <- "#D3D3D3" # Gris claro
+custom_colors["Other"] <- "#D3D3D3" # Gris claro
 
 # 4. Visualización con GGPLOT2
 # ==============================================================================
@@ -331,7 +331,7 @@ grafico_taxonomia_ps_H <- ggplot(df_final, aes(x = especies, y = Percentage,
   )
 
 # Mostrar gráfico
-print(grafico_taxonomia_ps_H)
+grafico_taxonomia_ps_H
 
 #### MACHOS #####
 # 1. Preparación del objeto Phyloseq
@@ -367,7 +367,7 @@ df_final_m <- df_grouped_m %>%
             by = c("especies", "Family")) %>%
   # Si la familia NO estaba en el top10 (Classification es NA), la llamamos "Otras"
   dplyr::mutate(Taxonomy_Display = ifelse(is.na(Classification), 
-                                          "Otras", 
+                                          "Other", 
                                           as.character(Family))) %>%
   # Volvemos a agrupar y sumar para colapsar todas las "Otras" en una sola fila por especie
   dplyr::group_by(especies, Taxonomy_Display) %>%
@@ -375,16 +375,16 @@ df_final_m <- df_grouped_m %>%
   # Convertir abundancia relativa (0-1) a porcentaje (0-100) para el gráfico
   dplyr::mutate(Percentage = TotalMeanAbund * 100)
 View(df_final_m)
-write.csv(df_final_m, file = "abundancias_family_machos_marzo2026.csv")
+#write.csv(df_final_m, file = "abundancias_family_machos_marzo2026_10.csv")
 # 3. Preparación para Graficar
 # ==============================================================================
 
 # G. Ordenar los factores para que "Otras" siempre aparezca abajo en la barra y leyenda.
 # Primero obtenemos todos los nombres únicos excepto "Otras" y los ordenamos alfabéticamente
-taxa_names_m <- sort(setdiff(unique(df_final_m$Taxonomy_Display), "Otras"))
+taxa_names_m <- sort(setdiff(unique(df_final_m$Taxonomy_Display), "Other"))
 # Creamos el factor con "Otras" al final
 df_final_m$Taxonomy_Display <- factor(df_final_m$Taxonomy_Display, 
-                                    levels = c(taxa_names_m, "Otras"))
+                                    levels = c(taxa_names_m, "Other"))
 
 # H. Definir una paleta de colores. El Top 10 por especie puede generar
 # fácilmente entre 15 y 30 familias únicas en total para graficar.
@@ -395,7 +395,7 @@ custom_colors_m <- getPalette(n_colors_m)
 
 # Asignar explícitamente el color gris a "Otras"
 names(custom_colors_m) <- levels(df_final_m$Taxonomy_Display)
-custom_colors_m["Otras"] <- "#D3D3D3" # Gris claro
+custom_colors_m["Other"] <- "#D3D3D3" # Gris claro
 
 # 4. Visualización con GGPLOT2
 # ==============================================================================
@@ -427,15 +427,22 @@ grafico_taxonomia_ps_M <- ggplot(df_final_m, aes(x = especies, y = Percentage,
   )
 
 # Mostrar gráfico
-print(grafico_taxonomia_ps_M)
+grafico_taxonomia_ps_M
+
+# Uniendo graficas
+ggarrange(grafico_taxonomia_ps_H, grafico_taxonomia_ps_M, ncol = 2, nrow = 1,
+          labels = "AUTO")
+
+
 
 ###############################################################################
 # ANALIZANDO UNICAMENTE LAS MUESTRAS DE FLORES VIRGENES (SIN VISITA) PARA
 # EVALUAR EL EFECTO DE LA DOMESTICACIÓN SOBRE LA COMPOSICIÓN DE LA 
 # COMUNIDAD DE MICROORGANISMOS.
-s16_7 = subset_samples(s16_6, tratamiento=="t1")
-s16_7
-summarize_phyloseq(s16_7)  #79771 reads, 1635 ASVs
+#s16_7 = subset_samples(s16_6, tratamiento=="t1")
+#s16_7
+#summarize_phyloseq(s16_7)  #79771 reads, 1635 ASVs
+s16_6
 
 #### ANALYSIS WITH PROPORTION DATA ####
 ### Calculating relative abundances
@@ -453,7 +460,7 @@ View(phy_pro)
 
 #### HEATMAPs of most abundant bacteria ####
 ### Collapse dataset taxonomy to 10 most abundant families
-topfam_pro <- aggregate_top_taxa2(s16_7, "Family", top = 10)
+topfam_pro <- aggregate_top_taxa2(s16_6, "Family", top = 10)
 View(otu_table(topfam_pro))
 topfam_pro
 
@@ -481,8 +488,8 @@ heatmap_k_pro
 
 
 # Separando por sexos florales
-hembras_pro <- subset_samples(s16_7, sexo == "hembra")
-machos_pro <- subset_samples(s16_7, sexo == "macho")
+hembras_pro <- subset_samples(s16_6, sexo == "hembra")
+machos_pro <- subset_samples(s16_6, sexo == "macho")
 
 ### Calculating relative abundances for Female flowers
 merged_hembras_pro <- merge_samples(hembras_pro, "especies")
@@ -506,6 +513,7 @@ topfam_hempro <- aggregate_top_taxa2(hembras_pro, "Family", top = 10)
 # transform families dataset to relative abundance
 transform <- microbiome::transform
 famrel_hempro <- transform(topfam_hempro, "compositional")
+
 # Heatmap de flores hembra
 heatmap_hempro <- simple_heatmap(famrel_hempro,
                                  group.facet = "especies",
@@ -555,10 +563,12 @@ heatmaps_16s = ggarrange(heatmap_hempro, heatmap_macpro, nrow = 2,
 heatmaps_16s
 
 # Most dominant families en todas las muestras
-domipro <- dominant_taxa(s16_7,level = "Family") #group = "especies"
-#View(domipro$dominant_overview)
-write.csv(domipro$dominant_overview, file = "dominant_overview__NV.csv")
+domipro_H <- dominant_taxa(hembras_pro,level = "Family") #group = "especies"
+domipro_M <- dominant_taxa(machos_pro,level = "Family") #group = "especies"
 
+#View(domipro$dominant_overview)
+write.csv(domipro_H$dominant_overview, file = "dominant_overview_H.csv")
+write.csv(domipro_M$dominant_overview, file = "dominant_overview_M.csv")
 
 #### CORE MICROBIOTA ####
 
@@ -645,6 +655,8 @@ p <- plot_core(ps.relpro,
 print(p)
 
 # Plotting with upsetR
+BiocManager::install("ggtreeExtra")
+BiocManager::install("MicrobiotaProcess")
 library(MicrobiotaProcess)
 library(UpSetR)
 
@@ -1420,10 +1432,8 @@ pairwise.wilcox.test(hembras_alfa$observed, hembras_alfa$especies, exact=F)
 
 # shannon
 kruskal.test(hembras_alfa_to$diversity_shannon~hembras_alfa_to$tratamiento)
-
 kruskal.test(hembras_alfa_to$diversity_shannon~hembras_alfa_to$condicion)
 kruskal.test(hembras_alfa_to$diversity_shannon~hembras_alfa_to$especies)
-
 pairwise.wilcox.test(hembras_alfa$diversity_shannon,
                      hembras_alfa$especies, exact=F)
 
@@ -1478,33 +1488,10 @@ kruskal.test(machos_alfa_to$diversity_shannon~machos_alfa_to$especies)
 pairwise.wilcox.test(machos_alfa_to$diversity_shannon,
                      machos_alfa_to$especies, exact=F)
 
-mod21 = aov(machos_alfa_to$diversity_shannon ~ machos_alfa_to$tratamiento *
-              machos_alfa_to$especies)
-summary(mod21)
 
-
-
-mod22 = aov(machos_alfa_to$diversity_shannon ~ machos_alfa_to$condicion +
-              machos_alfa_to$tratamiento + machos_alfa_to$especies)
-summary(mod22)
-
-mod23 = aov(hembras_alfa_to$diversity_shannon ~ hembras_alfa_to$condicion +
-              hembras_alfa_to$tratamiento + hembras_alfa_to$especies)
-summary(mod23)
-
-
-mod24 <- aov(hembras_alfa_to$diversity_shannon ~ hembras_alfa_to$condicion /
-               hembras_alfa_to$especies * hembras_alfa_to$tratamiento)
-summary(mod24)
-
-mod25 <- aov(machos_alfa_to$diversity_shannon ~ machos_alfa_to$condicion /
-               machos_alfa_to$especies * machos_alfa_to$tratamiento)
-summary(mod25)
-
-
-# Opción con función GLM base (considerando Especie como efecto fijo)
+#### Opción con función GLM base (considerando Especie como efecto fijo) ####
 modglm1 <- glm(diversity_shannon ~ condicion / especies * tratamiento, 
-                        family = gaussian(link = "identity"), data = machos_alfa_to)
+              family = gaussian(link = "identity"), data = machos_alfa_to)
 summary(modglm1)
 anova(modglm1)
 
@@ -1514,7 +1501,7 @@ modglm2 = glm(diversity_shannon ~ especies * tratamiento,
 summary(modglm2)
 anova(modglm2)
 
-
+# Flores hembra
 modglm3 <- glm(diversity_shannon ~ condicion / especies * tratamiento, 
                family = gaussian(link = "identity"), data = hembras_alfa_to)
 summary(modglm3)
@@ -1524,8 +1511,6 @@ modglm4 = glm(diversity_shannon ~ especies * tratamiento,
             family = gaussian(link = "identity"), data = hembras_alfa_to)
 summary(modglm4)
 anova(modglm4)
-
-
 
 library(emmeans)
 
@@ -1538,22 +1523,11 @@ comp1
 # comparando todas las especies sin anidar
 comp2 <- emmeans(modglm1, pairwise ~ especies)
 comp2
-# comparando las especies pero separando por tratamiento
-comp3 <- emmeans(modglm1, pairwise ~ especies | tratamiento)
-comp3
 
-# Ver los resultados
-summary(comparaciones_por_visita)
-
-
-comp2 <- emmeans(modglm2,
+# hembras
+comp3 <- emmeans(modglm3,
                  pairwise ~ especies | condicion)
-comp2
-
-
-
-# Ver los resultados
-summary(comparaciones)
+comp3
 
 
 # PD
@@ -1561,57 +1535,6 @@ kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
 pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
                      exact=F)
 
-# análisis de indice de Shannon de las flores macho
-aov2 = aov(machos_alfa$diversity_shannon ~ machos_alfa$especies)
-summary(aov2)
-TukeyHSD(aov2)
-plot(aov2)
-shapiro.test(residuals(aov2))
-
-aov2_2 = aov(machos_alfa$diversity_shannon ~ machos_alfa$condicion)
-summary(aov2_2)
-
-### STATISTICAL ANALYSIS OF ALPHA DIVERSITY
-library(emmeans)
-mean(div.df2$observed)
-var(div.df2$observed)
-# Richness
-mod4 = glm(observed ~ especies*sexo, data = div.df2,
-           family = quasipoisson)
-summary(mod4)
-anova(mod4)
-# post-hoc comparisons
-compa4 = emmeans(mod4, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
-compa4
-compa4.1 = emmeans(mod4,
-                   specs = pairwise ~ especies,
-                   type = "response")
-compa4.1
-#write.csv(compa1$contrasts, file = "observed_compa_rarefied.csv")
-
-# Shannon
-mod5 = glm(diversity_shannon ~ especies*sexo, data = div.df2)
-summary(mod5)
-anova(mod5)
-# post-hoc comparisons
-compa5 = emmeans(mod5, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
-compa5
-#modx = aov(diversity_shannon ~ especies*sexo*tratamiento, data = div.df)
-#summary(modx)
-
-# Phylogenetic Diversity index
-mod6 = glm(Phylogenetic_Diversity ~ especies*sexo, data = div.df2)
-summary(mod6)
-anova(mod6)
-# post-hoc comparisons
-compa6 = emmeans(mod6, 
-                 specs = pairwise ~ especies | sexo, 
-                 type = "response")
-compa6
 
 ##### VISUALIZATION  OF ALPHA DIVERSITY WITH PROPORTION DATA####
 ### Shannon flores macho

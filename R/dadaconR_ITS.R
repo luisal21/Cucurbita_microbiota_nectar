@@ -556,86 +556,6 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
   geom_smooth(method="lm", se = FALSE) +
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
-###############################################################################
-# 1. Extraer la tabla de taxonomía como un dataframe normal de R
-tabla_tax_hongos <- as.data.frame(tax_table(its6))
-
-# 2. Reemplazar los verdaderos NA en la columna de Familia
-# Asegúrate de que tu columna se llame exactamente "Family" (o cámbialo si está en español)
-tabla_tax_hongos$Family[is.na(tabla_tax_hongos$Family)] <- "Unclassified"
-
-# 3. (Opcional pero recomendado) Hacer lo mismo si hay NAs en Género u otros niveles
-# tabla_tax_hongos$Genus[is.na(tabla_tax_hongos$Genus)] <- "No clasificado"
-
-# 4. Devolver la tabla corregida a tu objeto phyloseq original
-tax_table(its6) <- tax_table(as.matrix(tabla_tax_hongos))
-
-View(tax_table(its6))
-
-# Separando por sexos florales
-hembras_its <- subset_samples(its6, sexo == "hembra")
-machos_its <- subset_samples(its6, sexo == "macho")
-
-
-# 0. Asegurarnos de que los NA están nombrados (lo que ya hiciste, lo dejo por seguridad)
-tax_table(hembras_its)[is.na(tax_table(hembras_its)[,"Family"]),
-                       "Family"] <- "Unclassified"
-
-# 1. Aglomerar a nivel de Familia (asegurando no borrar NAs)
-ps_fam_itsh <- tax_glom(hembras_its, taxrank = "Family", NArm = FALSE)
-
-# 2. EL PASO MÁGICO: Fusionar todas las réplicas por Especie
-# Esto crea una "Súper Muestra" por cada especie de Cucurbita sumando sus reads reales
-ps_merged_itsh <- merge_samples(ps_fam_itsh, group = "especie")
-
-# 3. Calcular la abundancia relativa sobre las muestras ya fusionadas
-# ¡Matemáticamente garantizado que cada especie sumará 1 (100%)!
-ps_rel_itsh <- transform_sample_counts(ps_merged_itsh, function(x) x / sum(x))
-
-# 4. Derretir a formato de tabla
-df_melt_itsh <- psmelt(ps_rel_itsh) %>%
-  # merge_samples pasa el nombre del grupo a la columna 'Sample', la renombramos
-  dplyr::rename(Especie = Sample) 
-
-# 5. Sacar el Top 10 por especie y agrupar en "Otras"
-top10_por_especie_itsh <- df_melt_itsh %>%
-  dplyr::group_by(especie) %>%
-  dplyr::slice_max(order_by = Abundance, n = 10, with_ties = FALSE) %>%
-  dplyr::mutate(Top_Family = Family) %>%
-  dplyr::select(especie, Family, Top_Family)
-
-df_final_itsh <- df_melt_itsh %>%
-  dplyr::left_join(top10_por_especie_itsh, by = c("especie", "Family")) %>%
-  dplyr::mutate(
-    Taxonomy_Display = ifelse(is.na(Top_Family), "Otras", as.character(Family)),
-    # Convertir a porcentaje (0 a 100)
-    Percentage = Abundance * 100 
-  ) %>%
-  # Colapsar las "Otras" en una sola fila por especie sumando sus porcentajes
-  dplyr::group_by(especie, Taxonomy_Display) %>%
-  dplyr::summarise(Percentage = sum(Percentage), .groups = "drop")
-
-# 6. Ordenar para el gráfico (poner "Otras" al final)
-nombres_taxa_itsh <- sort(setdiff(unique(df_final_itsh$Taxonomy_Display),
-                             c("Otras", "No clasificado")))
-df_final_itsh$Taxonomy_Display <- factor(df_final_itsh$Taxonomy_Display, 
-                                    levels = c(nombres_taxa_itsh,
-                                               "No clasificado", "Otras"))
-
-# 7. Graficar (Mismo código de ggplot que ya tenías)
-ggplot(df_final_itsh, aes(x = especie, y = Percentage, fill = Taxonomy_Display)) +
-  geom_bar(stat = "identity", position = "stack", color = "black", linewidth = 0.2) +
-  labs(y = "Abundancia Relativa (%)", x = "Especie de Cucurbita", fill = "Familia:") +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
-
-
-
-
-
-
-
-
 
 
 ###### HEMBRAS ####
@@ -661,7 +581,7 @@ df_grouped_itsh <- df_melt_itsh %>%
 # Usamos slice_max para quedarnos con las 10 filas con mayor abundancia promedio por grupo.
 top10_per_species_itsh <- df_grouped_itsh %>%
   group_by(especie) %>%
-  slice_max(order_by = MeanRelAbund, n = 10, with_ties = FALSE) %>%
+  slice_max(order_by = MeanRelAbund, n = 5, with_ties = FALSE) %>%
   mutate(Classification = Family) %>% # Guardamos el nombre para el cruce
   ungroup()
 

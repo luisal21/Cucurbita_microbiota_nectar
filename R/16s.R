@@ -1529,7 +1529,6 @@ comp3 <- emmeans(modglm3,
                  pairwise ~ especies | condicion)
 comp3
 
-
 # PD
 kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
 pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
@@ -1540,8 +1539,8 @@ pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
 ### Shannon flores macho
 # Crear el gráfico base
 grafico_shannon1 <- ggplot(machos_alfa_to, aes(x = especies,
-                          y = diversity_shannon, fill = tratamiento)) +
-  
+                          y = diversity_shannon, fill = condicion)) +
+  #, fill = tratamiento
   # Añadir las cajas (boxplots)
   geom_boxplot(color = "black", alpha = 0.8, outlier.shape = 16) +
   geom_point(position = position_jitterdodge(jitter.width = 0.1),
@@ -1571,7 +1570,7 @@ grafico_shannon1 <- ggplot(machos_alfa_to, aes(x = especies,
   )
 
 # Mostrar el gráfico
-print(grafico_shannon1)
+grafico_shannon1
 
 ### Shannon flores macho
 # Crear el gráfico base

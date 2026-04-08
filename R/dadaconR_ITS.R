@@ -392,6 +392,8 @@ library(reshape2)
 #library(minpack.lm) # no instalado
 library(Hmisc)
 library(stats4)
+library(ggpubr)
+
 #library(patchwork) # no instalado
 
 
@@ -557,6 +559,21 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 
+##############################################################################
+# Separando por sexos florales
+hembras_its <- subset_samples(its6, sexo == "hembra")
+machos_its <- subset_samples(its6, sexo == "macho")
+
+plot_bar(hembras_its, fill = "Phylum") +
+  geom_bar(aes(color = Phylum), stat = "identity",
+           position = "stack")
+
+sample_data(its6)
+
+its2_5_re  = transform_sample_counts(hembras_its, function(x) x / sum(x) )
+its2_5_re
+plot_bar(its2_5_re, fill="Class") +
+  geom_bar(aes(color = Class), stat = "identity", position = "stack")
 
 ###### HEMBRAS ####
 # 1. Preparación del objeto Phyloseq
@@ -570,12 +587,18 @@ ps_rel_itsh <- transform_sample_counts(ps_fam_itsh, function(x) x / sum(x))
 
 # C. Convertir el objeto phyloseq a un dataframe largo ('melted' dataframe)
 df_melt_itsh <- psmelt(ps_rel_itsh)
+View(df_melt_itsh)
 
 # D. Agrupar por Especie y Familia, y calcular la abundancia relativa PROMEDIO
 # para esa especie de planta.
+library(dplyr)
+
 df_grouped_itsh <- df_melt_itsh %>%
   dplyr::group_by(especie, Family) %>% 
   dplyr::summarize(MeanRelAbund = mean(Abundance), .groups = "drop")
+
+View(df_grouped_itsh)
+write.csv(df_grouped_itsh, file = "abundancias_its_ABRIL-2026.csv")
 
 # E. Identificar el Top 10 de familias más abundantes POR ESPECIE.
 # Usamos slice_max para quedarnos con las 10 filas con mayor abundancia promedio por grupo.
@@ -618,6 +641,7 @@ df_final_itsh$Taxonomy_Display <- factor(df_final_itsh$Taxonomy_Display,
 n_colors_itsh <- length(unique(df_final_itsh$Taxonomy_Display))
 getPalette_itsh = colorRampPalette(brewer.pal(12, "Paired"))
 custom_colors_itsh <- getPalette(n_colors_itsh)
+
 
 # Asignar explícitamente el color gris a "Otras"
 names(custom_colors_itsh) <- levels(df_final_itsh$Taxonomy_Display)
@@ -676,7 +700,7 @@ df_melt_itsm <- psmelt(ps_rel_itsm)
 df_grouped_itsm <- df_melt_itsm %>%
   dplyr::group_by(especie, Family) %>% 
   dplyr::summarize(MeanRelAbund = mean(Abundance), .groups = "drop")
-
+View(df_grouped_itsm)
 # E. Identificar el Top 10 de familias más abundantes POR ESPECIE.
 # Usamos slice_max para quedarnos con las 10 filas con mayor abundancia promedio por grupo.
 top10_per_species_itsm <- df_grouped_itsm %>%
@@ -758,18 +782,18 @@ print(grafico_taxonomia_its_M)
 # ANALIZANDO UNICAMENTE LAS MUESTRAS DE FLORES VIRGENES (SIN VISITA) PARA
 # EVALUAR EL EFECTO DE LA DOMESTICACIÓN SOBRE LA COMPOSICIÓN DE LA 
 # COMUNIDAD DE MICROORGANISMOS.
-its7 = subset_samples(its6, tratamiento=="t1")
-its7
-summarize_phyloseq(its7)  #79771 reads, 1635 ASVs
+#its7 = subset_samples(its6, tratamiento=="t1")
+#its7
+#summarize_phyloseq(its7)  #79771 reads, 1635 ASVs
 
 
 ### Calculating relative abundances
-mergedGP_its <- merge_samples(its7, "especie")
+#mergedGP_its <- merge_samples(its7, "especie")
 # Use psmelt to obtain a long-format data.frame
-phy_its <- mergedGP_its %>% tax_glom(taxrank = "Family") %>%
-  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
-View(phy_its)
-write.csv(phy_its, file = "abundancias_family_its_NV.csv")
+#phy_its <- mergedGP_its %>% tax_glom(taxrank = "Family") %>%
+#  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#View(phy_its)
+#write.csv(phy_its, file = "abundancias_family_its_NV.csv")
 
 #mergedtop = merge_samples(topfam, "especies")
 #phy2 <- mergedtop %>% tax_glom(taxrank = "Family") %>%
@@ -779,7 +803,7 @@ write.csv(phy_its, file = "abundancias_family_its_NV.csv")
 #### HEATMAPs of most abundant bacteria ####
 ### Collapse dataset taxonomy to 10 most abundant families
 library(microbiomeutilities)
-topfam_its <- aggregate_top_taxa2(its7, "Family", top = 10)
+topfam_its <- aggregate_top_taxa2(its6, "Family", top = 10)
 View(otu_table(topfam_its))
 topfam_its
 
@@ -807,10 +831,6 @@ heatmap_its <- simple_heatmap(famrel_its,
 heatmap_its
 
 
-# Separando por sexos florales
-hembras_its <- subset_samples(its7, sexo == "hembra")
-machos_its <- subset_samples(its7, sexo == "macho")
-
 ### Calculating relative abundances for Female flowers
 merged_hembras_its <- merge_samples(hembras_its, "especie")
 # Use psmelt to obtain a long-format data.frame
@@ -824,6 +844,9 @@ merged_machos_its <- merge_samples(machos_its, "especie")
 # Use psmelt to obtain a long-format data.frame
 phy_machos_its <- merged_machos_its %>% tax_glom(taxrank = "Family") %>%
   transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+
+
+
 #View(phy_machos_its)
 write.csv(phy_machos_its, file = "abundancias_machos_its_NV.csv")
 
@@ -883,7 +906,7 @@ heatmaps_its
 
 ### Save heatmaps
 
-ggsave("heatmaps_june.pdf", 
+ggsave("heatmaps_abril2026.pdf", 
        plot = heatmaps,
        width = 20, 
        height = 20, 

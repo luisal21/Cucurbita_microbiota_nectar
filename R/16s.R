@@ -695,7 +695,7 @@ upset(uppenpro, nsets = 6, mainbar.y.label = "Number of ASVs shared",
 # Primero nos aseguramos que estamos usando las funciones del paquete correcto
 transform <- microbiome::transform
 # Proportion Normalization
-pseq_16s <- transform(s16_7, "compositional")
+pseq_16s <- transform(s16_6, "compositional")
 
 
 library(knitr)
@@ -1128,221 +1128,7 @@ p2 <- p2 + stat_compare_means(comparisons = spp.pairs)
 print(p2) # Wilcox test
 
 
-########## BETA DIVERSITY  WITH PROPORTION DATA ##########
-library(vegan)
-# phyloseq object filtered but no rarefied
-s16_7 
-# divided by sex
-hembras_pro
-machos_pro
 
-#### Unweighted UniFrac HEMBRAS ####
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-transform <- microbiome::transform
-# Proportion Normalization
-pseq_16s_hem <- transform(hembras_pro, "compositional")
-
-
-# PCoA plot using the unweighted UniFrac as distance
-ordination_16s_hem = ordinate(pseq_16s_hem, method="PCoA", "unifrac",
-                              weighted = F)
-
-baseplot_16s_hem <- plot_ordination(pseq_16s_hem, ordination_16s_hem,
-                                    color="especies",
-                                    shape = "condicion",
-                                    type = "samples",
-) + #shape = "sexo"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 5)+
-  scale_color_discrete(name = "Species", 
-                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_shape_discrete(name = "Condition",
-                       labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))
-#stat_ellipse()
-baseplot_16s_hem
-
-#baseplot_16s_hem +
-#  geom_point(size = 1)
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-
-#### Unweighted UniFrac MACHOS ####
-# Primero nos aseguramos que estamos usando las funciones del paquete correcto
-transform <- microbiome::transform
-# Proportion Normalization
-pseq_16s_mac <- transform(machos_pro, "compositional")
-
-# PCoA plot using the unweighted UniFrac as distance
-ordination_16s_mac = ordinate(pseq_16s_mac, method="PCoA", "unifrac",
-                              weighted = F)
-
-baseplot_16s_mac <- plot_ordination(pseq_16s_mac, ordination_16s_mac,
-                                    color="especies",
-                                    shape = "condicion",
-                                    type = "samples",
-) + #shape = "sexo"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 5)+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
-  scale_shape_discrete(name = "Condition",
-                       labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))
-#stat_ellipse()
-baseplot_16s_mac
-
-
-#### Weighted UniFrac HEMBRAS####
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_hem_wei = ordinate(pseq_16s_hem,
-                                  method="PCoA", "wunifrac")
-# Plot
-baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem, 
-                                        ordination_16s_hem_wei,
-                                        color="especies",
-                                        shape = "condicion",
-                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 4)+
-  scale_color_discrete(name = "Species", 
-                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
-                       palette = "Set1")+
-  scale_shape_discrete(name = "Condition",
-                       labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))
-  #scale_shape_manual(values=c(16,3))
-#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-#scale_color_discrete(name = "Condition", 
-#                    labels = c("Domesticated","Wild"))+
-#scale_color_discrete(name = "Treatment",
-#                     labels = c("No-visited","Visited"))
-
-baseplot_16s_hem_wei
-#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
-
-#baseplot_16s_hem_wei + stat_ellipse()
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
-#wei_16s
-#+ coord_fixed()
-
-#+ stat_ellipse(type = "t")
-#baseplot_16s_hem_wei + stat_ellipse(type = "t")
-
-
-#### Weighted UniFrac MACHOS####
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_mac_wei = ordinate(pseq_16s_mac,
-                                  method="PCoA", "wunifrac")
-# Plot
-baseplot_16s_mac_wei <- plot_ordination(pseq_16s_mac, 
-                                        ordination_16s_mac_wei,
-                                        color="especies",
-                                        shape = "condicion",
-                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 4)+
-  scale_color_discrete(name = "Species", 
-                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
-                       palette = "Set1")+
-  scale_shape_discrete(name = "Condition",
-                       labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))
-#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-#scale_color_discrete(name = "Condition", 
-#                    labels = c("Domesticated","Wild"))+
-#scale_color_discrete(name = "Treatment",
-#                     labels = c("No-visited","Visited"))
-
-baseplot_16s_mac_wei
-
-#baseplot_16s_mac_wei + stat_ellipse()
-
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-
-
-#### PERMANOVA by floral gender####
-## female flowers
-metadf_hem = data.frame(sample_data(hembras_pro))
-
-# calculating Weighted-UniFrac
-wunifrac.dist_hem <- UniFrac(pseq_16s_hem, 
-                             weighted = TRUE, 
-                             normalized = TRUE,  
-                             parallel = FALSE, 
-                             fast = TRUE)
-
-#Test dispersion among body sites
-disp_wun <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$especies)
-permutest(disp_wun)
-
-# Run PERMANOVA
-set.seed(100)   # Set the seed to make the analysis reproducible
-perm_hem = adonis2(wunifrac.dist_hem ~ condicion + especies, data = metadf_hem,
-                   by = "terms", permutations = 999)
-perm_hem
-
-## Male flowers
-metadf_mac = data.frame(sample_data(machos_pro))
-
-# calculating Weighted-UniFrac
-wunifrac.dist_mac <- UniFrac(pseq_16s_mac, 
-                             weighted = TRUE, 
-                             normalized = TRUE,  
-                             parallel = FALSE, 
-                             fast = TRUE)
-
-#Test dispersion among body sites
-disp_wun_mac1 <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$condicion)
-permutest(disp_wun_mac1)
-disp_wun_mac2 <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$especies)
-permutest(disp_wun_mac2)
-
-
-# Run PERMANOVA
-set.seed(100)   # Set the seed to make the analysis reproducible
-perm_mac = adonis2(wunifrac.dist_mac ~ condicion + especies, data = metadf_mac,
-                   by = "terms", permutations = 999)
-perm_mac
-
-
-###############################################################################
-# calculating Unweighted-UniFrac
-unifrac.dist <- UniFrac(pseq_16s, 
-                        weighted = FALSE, 
-                        normalized = TRUE,  
-                        parallel = FALSE, 
-                        fast = TRUE)
-# Run PERMANOVA
-set.seed(100)   # Set the seed to make the analysis reproducible
-perm4 = adonis2(unifrac.dist ~ especies*sexo, data = metadf,
-                by = "terms", permutations = 999)
-perm4  
-
-?betadisper
-ps.disper <- betadisper(unifrac.dist, metadf$especies)
-permutest(ps.disper, pairwise = TRUE)
-anova(ps.disper)
-TukeyHSD(ps.disper)
 
 
 ###############################################################################
@@ -1424,39 +1210,6 @@ shapiro.test(hembras_alfa_to$observed)
 shapiro.test(hembras_alfa_to$diversity_shannon)
 shapiro.test(hembras_alfa_to$Phylogenetic_Diversity)
 
-#### STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
-# Analysis with kruskal-Wallis and Wilcox text in female flowers #
-# Observed by species
-kruskal.test(hembras_alfa$observed~hembras_alfa$especies)
-pairwise.wilcox.test(hembras_alfa$observed, hembras_alfa$especies, exact=F)
-
-# shannon
-kruskal.test(hembras_alfa_to$diversity_shannon~hembras_alfa_to$tratamiento)
-kruskal.test(hembras_alfa_to$diversity_shannon~hembras_alfa_to$condicion)
-kruskal.test(hembras_alfa_to$diversity_shannon~hembras_alfa_to$especies)
-pairwise.wilcox.test(hembras_alfa$diversity_shannon,
-                     hembras_alfa$especies, exact=F)
-
-mod20 = aov(hembras_alfa_to$diversity_shannon ~ hembras_alfa_to$tratamiento * 
-      hembras_alfa_to$condicion)
-summary(mod20)
-
-# PD
-kruskal.test(hembras_alfa$Phylogenetic_Diversity~hembras_alfa$especies)
-pairwise.wilcox.test(hembras_alfa$Phylogenetic_Diversity, hembras_alfa$especies, exact=F)
-
-# análisis de varianza del indice de Shannon de flores hembra
-aov1 = aov(hembras_alfa$diversity_shannon ~ hembras_alfa$especies)
-summary(aov1)
-TukeyHSD(aov1)
-plot(aov1)
-shapiro.test(residuals(aov1))
-residuals(aov1)
-
-aov1_1 = aov(hembras_alfa$diversity_shannon ~ hembras_alfa$condicion)
-summary(aov1_1)
-
-
 #### Diversidad alpha en flores macho ####
 head(div.df5)
 machos_alfa_to = subset(div.df5, sexo == "macho")
@@ -1475,21 +1228,10 @@ shapiro.test(machos_alfa_to$observed)
 shapiro.test(machos_alfa_to$diversity_shannon)
 shapiro.test(machos_alfa_to$Phylogenetic_Diversity)
 
-# Analysis with kruskal-Wallis and Wilcox text in male flowers #
-# Observed
-kruskal.test(machos_alfa$observed~machos_alfa$especies)
-pairwise.wilcox.test(machos_alfa$observed, machos_alfa$especies, exact=F)
 
-# shannon
-kruskal.test(machos_alfa_to$diversity_shannon~machos_alfa_to$tratamiento)
-
-kruskal.test(machos_alfa_to$diversity_shannon~machos_alfa_to$condicion)
-kruskal.test(machos_alfa_to$diversity_shannon~machos_alfa_to$especies)
-pairwise.wilcox.test(machos_alfa_to$diversity_shannon,
-                     machos_alfa_to$especies, exact=F)
-
-
+## STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
 #### Opción con función GLM base (considerando Especie como efecto fijo) ####
+# Flores Macho
 modglm1 <- glm(diversity_shannon ~ condicion / especies * tratamiento, 
               family = gaussian(link = "identity"), data = machos_alfa_to)
 summary(modglm1)
@@ -1501,7 +1243,7 @@ modglm2 = glm(diversity_shannon ~ especies * tratamiento,
 summary(modglm2)
 anova(modglm2)
 
-# Flores hembra
+# Flores Hembra
 modglm3 <- glm(diversity_shannon ~ condicion / especies * tratamiento, 
                family = gaussian(link = "identity"), data = hembras_alfa_to)
 summary(modglm3)
@@ -1515,7 +1257,8 @@ anova(modglm4)
 library(emmeans)
 
 # Asumiendo que tu modelo se llama modelo_shannon
-# La barra "|" le dice a R: "Compara las Especies, pero hazlo POR SEPARADO dentro de cada Estado"
+# La barra "|" le dice a R: "Compara las Especies, pero hazlo POR SEPARADO 
+# dentro de cada Estado"
 # comparaciones con el modelo anidado
 comp1 = emmeans(modglm1,
                 pairwise ~ especies | condicion)
@@ -1528,14 +1271,64 @@ comp2
 comp3 <- emmeans(modglm3,
                  pairwise ~ especies | condicion)
 comp3
+# comparando todas las especies sin anidar
+comp4 <- emmeans(modglm3, pairwise ~ especies)
+comp4
 
-# PD
-kruskal.test(machos_alfa$Phylogenetic_Diversity~machos_alfa$especies)
-pairwise.wilcox.test(machos_alfa$Phylogenetic_Diversity, machos_alfa$especies,
-                     exact=F)
 
 
 ##### VISUALIZATION  OF ALPHA DIVERSITY WITH PROPORTION DATA####
+# Flores Hembra
+sha_hem = ggplot(hembras_alfa_to, aes(x=especies, y=diversity_shannon,
+                                   fill=condicion)) +
+  geom_boxplot(alpha = 0.8)+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_fill_discrete(name = "Condition", 
+                      labels = c("domesticada" = "Domesticated",
+                                 "silvestre" = "Wild"),
+                      palette = c("#E6AB02","#4D9221"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+
+sha_hem    
+
+#display.brewer.pal(n = 8, name = 'Greens')
+#brewer.pal(n = 8, name = "PiYG")
+
+### stripchart de Shannon diversity index in male flowers
+sha_mac = ggplot(machos_alfa_to, aes(x=especies, y=diversity_shannon,
+                                  fill=condicion)) +
+  geom_boxplot(alpha = 0.8)+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_fill_discrete(name = "Condition", 
+                      labels = c("domesticada" = "Domesticated",
+                                 "silvestre" = "Wild"),
+                      palette = c("#E6AB02","#4D9221"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic() +
+  theme(legend.position = "none")
+sha_mac
+
+#facet_wrap(~sexo, labeller = labeller(sexo = sexos))
+#stat_summary(fun=mean, geom="point", shape=18,
+#            size=6, color="red")
+sha_pro <- ggarrange(sha_mac, sha_hem, ncol = 2, nrow = 1,
+                     labels = "AUTO")
+sha_pro
+
+
+
+
 ### Shannon flores macho
 # Crear el gráfico base
 grafico_shannon1 <- ggplot(machos_alfa_to, aes(x = especies,
@@ -1862,26 +1655,227 @@ print(p2) # Wilcox test
 
 ###############################################################################
 #### DIVERSIDAD BETA ####
-
-
-# Instalar vegan si no lo tienes
-# install.packages("vegan")
+########## BETA DIVERSITY  WITH PROPORTION DATA ##########
 library(vegan)
+# phyloseq object filtered but no rarefied
+s16_6 
+# divided by sex
+hembras_pro
+machos_pro
 
-# 1. Crear la matriz de distancias (ej. Bray-Curtis) a partir de tu tabla de abundancias de microbios
-# Asumimos que 'tabla_microbios' tiene las muestras en las filas y las especies de microbios en las columnas
-distancias_bray <- vegdist(tabla_microbios, method = "bray")
+#### Unweighted UniFrac HEMBRAS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s_hem <- transform(hembras_pro, "compositional")
 
-# 2. Correr el PERMANOVA con el diseño anidado
-# Asumimos que 'datos' es tu tabla de metadatos (donde están Estado, Especie, Tratamiento)
-modelo_permanova <- adonis2(distancias_bray ~ Estado / Especie * Tratamiento, 
-                            data = datos, 
-                            permutations = 999, 
-                            by = "terms") # 'terms' evalúa secuencialmente, respetando el anidamiento
 
-# Ver el resultado
-print(modelo_permanova)
+# PCoA plot using the unweighted UniFrac as distance
+ordination_16s_hem = ordinate(pseq_16s_hem, method="PCoA", "unifrac",
+                              weighted = F)
 
+baseplot_16s_hem <- plot_ordination(pseq_16s_hem, ordination_16s_hem,
+                                    color="especies",
+                                    shape = "condicion",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 5)+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_shape_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))
+#stat_ellipse()
+baseplot_16s_hem
+
+#baseplot_16s_hem +
+#  geom_point(size = 1)
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+#### Unweighted UniFrac MACHOS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_16s_mac <- transform(machos_pro, "compositional")
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_16s_mac = ordinate(pseq_16s_mac, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_16s_mac <- plot_ordination(pseq_16s_mac, ordination_16s_mac,
+                                    color="especies",
+                                    shape = "condicion",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 5)+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_shape_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))
+#stat_ellipse()
+baseplot_16s_mac
+
+
+#### Weighted UniFrac HEMBRAS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_hem_wei = ordinate(pseq_16s_hem,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_hem_wei <- plot_ordination(pseq_16s_hem, 
+                                        ordination_16s_hem_wei,
+                                        color="especies",
+                                        shape = "condicion",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
+  scale_shape_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))
+#scale_shape_manual(values=c(16,3))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_16s_hem_wei
+#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
+
+#baseplot_16s_hem_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
+#wei_16s
+#+ coord_fixed()
+
+#+ stat_ellipse(type = "t")
+#baseplot_16s_hem_wei + stat_ellipse(type = "t")
+
+
+#### Weighted UniFrac MACHOS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_mac_wei = ordinate(pseq_16s_mac,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_mac_wei <- plot_ordination(pseq_16s_mac, 
+                                        ordination_16s_mac_wei,
+                                        color="especies",
+                                        shape = "condicion",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
+  scale_shape_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_16s_mac_wei
+
+#baseplot_16s_mac_wei + stat_ellipse()
+
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+
+#### PERMANOVA by floral gender####
+## female flowers
+metadf_hem = data.frame(sample_data(hembras_pro))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_hem <- UniFrac(pseq_16s_hem, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_hem = adonis2(wunifrac.dist_hem ~ condicion / especies * tratamiento,
+                   data = metadf_hem, by = "terms", permutations = 999)
+perm_hem
+
+
+#Test dispersion among treatments and species
+disp_wun1 <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$condicion)
+permutest(disp_wun1)
+disp_wun2 <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$tratamiento)
+permutest(disp_wun2)
+disp_wun3 <- betadisper(wunifrac.dist_hem, sample_data(hembras_pro)$especies)
+permutest(disp_wun3) # especies heterogeneas
+
+
+#### Male flowers ####
+metadf_mac = data.frame(sample_data(machos_pro))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_mac <- UniFrac(pseq_16s_mac, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+# Run PERMANOVA of MALE FLOWERS
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_mac = adonis2(wunifrac.dist_mac ~ condicion / especies * tratamiento,
+                   data = metadf_mac, by = "terms", permutations = 999)
+perm_mac
+
+#Test dispersion among species, treatments and condition
+disp_wun_mac1 <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$condicion)
+permutest(disp_wun_mac1) # p = 0.003**
+disp_wun_mac2 <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$tratamiento)
+permutest(disp_wun_mac2) # p = 0.056 .
+disp_wun_mac3 <- betadisper(wunifrac.dist_mac, sample_data(machos_pro)$especies)
+permutest(disp_wun_mac3) # p = 0.001***
+
+###############################################################################
+# calculating Unweighted-UniFrac
+unifrac.dist <- UniFrac(pseq_16s, 
+                        weighted = FALSE, 
+                        normalized = TRUE,  
+                        parallel = FALSE, 
+                        fast = TRUE)
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm4 = adonis2(unifrac.dist ~ especies*sexo, data = metadf,
+                by = "terms", permutations = 999)
+perm4  
+
+?betadisper
+ps.disper <- betadisper(unifrac.dist, metadf$especies)
+permutest(ps.disper, pairwise = TRUE)
+anova(ps.disper)
+TukeyHSD(ps.disper)
 
 
 ##############################################################################

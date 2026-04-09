@@ -1,0 +1,450 @@
+---
+title: "Prueba 1: Combinando base UNITE con base GenBank"
+output:
+  html_document: default
+  pdf_document: default
+date: "2026-04-09"
+---
+
+##Paso 1: Explorar términos adicionales antes de descargar
+```{r, echo=FALSE}
+library(rentrez)
+
+# Primero ver cuántas secuencias hay con términos adicionales
+# que no probamos antes
+terminos_extra <- list(
+  # Hongos en plantas en general
+  endophyte     = "ITS2[All Fields] AND Fungi[Organism] AND endophyte[All Fields] AND 200:900[SLEN]",
+  epiphyte      = "ITS2[All Fields] AND Fungi[Organism] AND epiphyte[All Fields] AND 200:900[SLEN]",
+  phyllosphere  = "ITS2[All Fields] AND Fungi[Organism] AND phyllosphere[All Fields] AND 200:900[SLEN]",
+  anthosphere   = "ITS2[All Fields] AND Fungi[Organism] AND anthosphere[All Fields] AND 200:900[SLEN]",
+  
+  # Partes de la planta
+  pollen        = "ITS2[All Fields] AND Fungi[Organism] AND pollen[All Fields] AND 200:900[SLEN]",
+  anther        = "ITS2[All Fields] AND Fungi[Organism] AND anther[All Fields] AND 200:900[SLEN]",
+  pistil        = "ITS2[All Fields] AND Fungi[Organism] AND pistil[All Fields] AND 200:900[SLEN]",
+  
+  # Insectos polinizadores
+  Apis          = "ITS2[All Fields] AND Fungi[Organism] AND Apis[All Fields] AND 200:900[SLEN]",
+  Xylocopa      = "ITS2[All Fields] AND Fungi[Organism] AND Xylocopa[All Fields] AND 200:900[SLEN]",
+  Peponapis     = "ITS2[All Fields] AND Fungi[Organism] AND Peponapis[All Fields] AND 200:900[SLEN]",
+  bee           = "ITS2[All Fields] AND Fungi[Organism] AND bee[All Fields] AND 200:900[SLEN]",
+  
+  # Hongos específicos de néctar y flores
+  nectarivore   = "ITS2[All Fields] AND Fungi[Organism] AND nectarivore[All Fields] AND 200:900[SLEN]",
+  yeast         = "ITS2[All Fields] AND Fungi[Organism] AND yeast[All Fields] AND flower[All Fields] AND 200:900[SLEN]",
+  
+  # Cucurbitáceas y cultivos relacionados
+  melon         = "ITS2[All Fields] AND Fungi[Organism] AND melon[All Fields] AND 200:900[SLEN]",
+  cucumber      = "ITS2[All Fields] AND Fungi[Organism] AND cucumber[All Fields] AND 200:900[SLEN]",
+  pumpkin       = "ITS2[All Fields] AND Fungi[Organism] AND pumpkin[All Fields] AND 200:900[SLEN]",
+  zucchini      = "ITS2[All Fields] AND Fungi[Organism] AND zucchini[All Fields] AND 200:900[SLEN]"
+)
+
+# Ver conteos
+resultados <- data.frame(termino = character(), count = integer())
+
+for(nombre in names(terminos_extra)){
+  resultado <- entrez_search(
+    db = "nucleotide",
+    term = terminos_extra[[nombre]],
+    retmax = 0,
+    use_history = TRUE
+  )
+  resultados <- rbind(resultados, 
+                      data.frame(termino = nombre, 
+                                 count = resultado$count))
+  cat(nombre, ":", resultado$count, "\n")
+  Sys.sleep(0.3)
+}
+
+# Ver ordenado de mayor a menor
+#resultados %>% arrange(desc(count))
+```
+
+##Paso 2: Query final combinado con todos los términos relevantes
+Una vez que veas los conteos, corremos el query combinado. Amplié el rango de longitud a 200-900 para no perder secuencias ITS completo (ITSx las recortará después):
+```{r, echo=FALSE}
+# Query completo combinando todos los términos relevantes
+query_completo <- '
+  ITS2[All Fields] AND 
+  Fungi[Organism] AND 
+  (
+    Cucurbita[All Fields] OR 
+    Cucurbitaceae[All Fields] OR
+    Bombus[All Fields] OR
+    Apis[All Fields] OR
+    Xylocopa[All Fields] OR
+    Peponapis[All Fields] OR
+    bee[All Fields] OR
+    nectar[All Fields] OR
+    floral[All Fields] OR
+    flower[All Fields] OR
+    pollen[All Fields] OR
+    anther[All Fields] OR
+    endophyte[All Fields] OR
+    phyllosphere[All Fields] OR
+    anthosphere[All Fields] OR
+    melon[All Fields] OR
+    cucumber[All Fields] OR
+    pumpkin[All Fields] OR
+    zucchini[All Fields]
+  ) AND 
+  200:900[SLEN]
+'
+
+# Ver total antes de descargar
+busqueda_total <- entrez_search(
+  db = "nucleotide",
+  term = query_completo,
+  retmax = 0,
+  use_history = TRUE
+)
+
+cat("Total secuencias a descargar:", busqueda_total$count, "\n")
+```
+
+##Paso 3: Descargar todo en lotes
+```{r, echo=FALSE}
+# Función robusta de descarga con manejo de errores
+descargar_lotes <- function(query, archivo_salida, batch_size = 200) {
+  
+  # Buscar con historial
+  busqueda <- entrez_search(
+    db = "nucleotide",
+    term = query,
+    retmax = 99999,
+    use_history = TRUE
+  )
+  
+  ids <- busqueda$ids
+  total <- length(ids)
+  cat("Descargando", total, "secuencias...\n")
+  
+  # Limpiar archivo si existe
+  if(file.exists(archivo_salida)) file.remove(archivo_salida)
+  
+  # Descargar en lotes
+  for(i in seq(1, total, by = batch_size)){
+    
+    lote <- ids[i:min(i + batch_size - 1, total)]
+    
+    # Reintentar hasta 3 veces si falla
+    intentos <- 0
+    exito <- FALSE
+    
+    while(!exito & intentos < 3){
+      tryCatch({
+        seqs <- entrez_fetch(
+          db = "nucleotide",
+          id = lote,
+          rettype = "fasta",
+          retmode = "text"
+        )
+        write(seqs, file = archivo_salida, append = TRUE)
+        exito <- TRUE
+      }, error = function(e){
+        intentos <<- intentos + 1
+        cat("Error en lote", i, "- reintentando...\n")
+        Sys.sleep(2)
+      })
+    }
+    
+    cat("Progreso:", min(i + batch_size - 1, total), "/", total, "\n")
+    Sys.sleep(0.5)  # pausa entre lotes
+  }
+  
+  cat("✓ Descarga completa:", archivo_salida, "\n")
+}
+
+# Correr descarga
+descargar_lotes(
+  query = query_completo,
+  archivo_salida = "hongos_flores_insectos_raw.fasta"
+)
+```
+
+##Paso 4: Limpiar y verificar en R
+```{r, echo=FALSE}
+library(Biostrings)
+library(dplyr)
+
+# Leer secuencias descargadas
+seqs_raw <- readDNAStringSet("hongos_flores_insectos_raw.fasta")
+cat("Total descargadas:", length(seqs_raw), "\n")
+
+# Eliminar duplicados por ID
+seqs_unicas <- seqs_raw[!duplicated(names(seqs_raw))]
+cat("Secuencias únicas:", length(seqs_unicas), "\n")
+
+# Eliminar secuencias con caracteres ambiguos excesivos (>10% N)
+prop_n <- letterFrequency(seqs_unicas, "N") / width(seqs_unicas)
+seqs_limpias <- seqs_unicas[prop_n < 0.10]
+cat("Secuencias después de filtrar Ns:", length(seqs_limpias), "\n")
+
+# Distribución de longitudes
+cat("\nResumen de longitudes:\n")
+summary(width(seqs_limpias))
+
+# Histograma
+hist(width(seqs_limpias),
+     breaks = 30,
+     main = "Distribución de longitudes - Referencias ITS",
+     xlab = "Longitud (bp)",
+     col = "steelblue",
+     border = "white")
+abline(v = c(200, 900), col = "red", lty = 2)
+
+# Guardar versión limpia para ITSx
+writeXStringSet(seqs_limpias, "hongos_flores_insectos_clean.fasta")
+cat("\n✓ Archivo listo para ITSx:", length(seqs_limpias), "secuencias\n")
+```
+
+##Paso 5: Extraer ITS2 con ITSx en terminal Linux
+Esto se hace con el programa ITSx en la terminal
+Una vez que tengas el archivo limpio:
+```{bash}
+# Activar ambiente conda si usas conda
+conda activate qiime2  # o el ambiente donde tengas ITSx
+
+# Verificar instalación
+ITSx --version
+
+# Extraer ITS2
+ITSx \
+  -i hongos_flores_insectos_clean.fasta \
+  -o hongos_ITS2_extraido \
+  --taxa Fungi \
+  --save_regions ITS2 \
+  -t F \
+  --cpu 4 \
+  --complement T \
+  --heuristics T \
+  --minlen 100
+
+# Ver cuántas secuencias ITS2 se extrajeron
+grep -c ">" hongos_ITS2_extraido.ITS2.fasta
+```
+
+El archivo final que combinarás en el Paso 6 debe tener el formato de headers correcto para DADA2:
+```{r}
+# DADA2 espera headers en este formato:
+# k__Fungi;p__Ascomycota;c__Dothideomycetes;o__Pleosporales;f__Pleosporaceae;g__Alternaria;s__alternata
+```
+UNITE ya viene en este formato, pero las secuencias que descargaste de GenBank necesitarán que sus headers se reformateen antes de combinarlas.
+
+#Reformatear Headers de GenBank al Formato DADA2
+
+##Paso 6: Extraer los IDs de tus secuencias de GenBank
+```{r, echo=FALSE}
+library(Biostrings)
+library(rentrez)
+library(dplyr)
+library(stringr)
+
+# Leer el archivo ITS2 extraído por ITSx
+seqs_its2 <- readDNAStringSet("hongos_ITS2_extraido.ITS2.fasta")
+cat("Total secuencias:", length(seqs_its2), "\n")
+
+# Extraer solo el ID de accesión del header
+# Header típico: >MK123456.1 Alternaria alternata...
+ids_accesion <- names(seqs_its2) %>%
+  str_extract("^[A-Z]{1,2}[0-9]{5,8}\\.[0-9]+") %>%  # extrae el ID tipo MK123456.1
+  str_replace("\\.[0-9]+$", "")  # quitar el .1 al final
+
+# Verificar que se extrajeron bien
+head(ids_accesion)
+cat("IDs extraídos:", length(ids_accesion), "\n")
+cat("IDs con NA:", sum(is.na(ids_accesion)), "\n")
+```
+
+##Paso 7: Obtener taxonomía completa desde NCBI
+```{r, echo=FALSE}
+# Función para obtener taxonomía de un lote de IDs
+obtener_taxonomia <- function(ids, batch_size = 50) {
+  
+  taxonomy_list <- list()
+  total <- length(ids)
+  
+  for(i in seq(1, total, by = batch_size)) {
+    
+    lote <- ids[i:min(i + batch_size - 1, total)]
+    lote <- lote[!is.na(lote)]  # eliminar NAs
+    
+    tryCatch({
+      # Obtener información del registro
+      sumario <- entrez_summary(
+        db = "nucleotide",
+        id = lote
+      )
+      
+      # Extraer taxonomía de cada registro
+      for(id in lote) {
+        tryCatch({
+          # Buscar el taxid asociado
+          registro <- entrez_fetch(
+            db = "nucleotide",
+            id = id,
+            rettype = "gb",
+            retmode = "text"
+          )
+          
+          # Extraer líneas de taxonomía del formato GenBank
+          lineas <- str_split(registro, "\n")[[1]]
+          
+          # Buscar organismo
+          organismo <- lineas[str_detect(lineas, "  ORGANISM")] %>%
+            str_extract("(?<=ORGANISM  ).*")
+          
+          # Buscar clasificación (líneas después de ORGANISM)
+          idx_org <- which(str_detect(lineas, "  ORGANISM"))
+          
+          if(length(idx_org) > 0) {
+            # La clasificación está en las siguientes líneas
+            tax_lineas <- lineas[(idx_org + 1):(idx_org + 4)]
+            clasificacion <- paste(tax_lineas, collapse = " ") %>%
+              str_replace_all("\\s+", " ") %>%
+              str_trim()
+            
+            taxonomy_list[[id]] <- list(
+              organismo = organismo,
+              clasificacion = clasificacion
+            )
+          }
+          
+          Sys.sleep(0.1)
+          
+        }, error = function(e) {
+          taxonomy_list[[id]] <<- list(organismo = NA, clasificacion = NA)
+        })
+      }
+      
+    }, error = function(e) {
+      cat("Error en lote", i, ":", e$message, "\n")
+    })
+    
+    cat("Procesados", min(i + batch_size - 1, total), "de", total, "\n")
+    Sys.sleep(0.5)
+  }
+  
+  return(taxonomy_list)
+}
+
+# Obtener taxonomía (puede tardar varios minutos)
+cat("Obteniendo taxonomía desde NCBI...\n")
+taxonomia_raw <- obtener_taxonomia(ids_accesion)
+```
+
+##Paso 8: Parsear taxonomía al formato DADA2
+```{r, echo=FALSE}
+# Función para convertir clasificación NCBI al formato DADA2
+parsear_taxonomia_dada2 <- function(organismo, clasificacion) {
+  
+  # Valores por defecto
+  reino  <- "Fungi"
+  filo   <- "unidentified"
+  clase  <- "unidentified"
+  orden  <- "unidentified"
+  familia <- "unidentified"
+  genero <- "unidentified"
+  especie <- "unidentified"
+  
+  tryCatch({
+    # Extraer género y especie del nombre del organismo
+    partes_org <- str_split(organismo, " ")[[1]]
+    if(length(partes_org) >= 1) genero  <- partes_org[1]
+    if(length(partes_org) >= 2) especie <- partes_org[2]
+    
+    # Parsear la clasificación taxonómica
+    # NCBI format: "Eukaryota; Fungi; Dikarya; Ascomycota; ..."
+    niveles <- str_split(clasificacion, ";")[[1]] %>%
+      str_trim()
+    
+    # Buscar niveles taxonómicos por palabras clave
+    for(nivel in niveles) {
+      if(str_detect(nivel, "phyta$|mycota$|mycetes$")) {
+        if(str_detect(nivel, "mycota$"))  filo  <- nivel
+        if(str_detect(nivel, "mycetes$")) clase <- nivel
+      }
+      if(str_detect(nivel, "ales$"))  orden   <- nivel
+      if(str_detect(nivel, "aceae$")) familia <- nivel
+    }
+    
+  }, error = function(e) {})
+  
+  # Construir header formato DADA2
+  header <- paste0(
+    "k__", reino,   ";",
+    "p__", filo,    ";",
+    "c__", clase,   ";",
+    "o__", orden,   ";",
+    "f__", familia, ";",
+    "g__", genero,  ";",
+    "s__", especie
+  )
+  
+  return(header)
+}
+
+# Aplicar a todas las secuencias
+cat("Construyendo headers formato DADA2...\n")
+
+headers_dada2 <- sapply(ids_accesion, function(id) {
+  if(!is.na(id) && !is.null(taxonomia_raw[[id]])) {
+    parsear_taxonomia_dada2(
+      organismo     = taxonomia_raw[[id]]$organismo,
+      clasificacion = taxonomia_raw[[id]]$clasificacion
+    )
+  } else {
+    "k__Fungi;p__unidentified;c__unidentified;o__unidentified;f__unidentified;g__unidentified;s__unidentified"
+  }
+})
+
+# Verificar algunos headers
+head(headers_dada2)
+```
+
+##Paso 9: Crear el archivo FASTA reformateado
+```{r, echo=FALSE}
+# Asignar nuevos headers a las secuencias
+names(seqs_its2) <- headers_dada2
+
+# Verificar que los headers quedaron bien
+head(names(seqs_its2))
+
+# Guardar archivo con headers formato DADA2
+writeXStringSet(seqs_its2, "genbank_ITS2_dada2_format.fasta")
+cat("✓ Archivo guardado: genbank_ITS2_dada2_format.fasta\n")
+
+# Verificar algunos registros del archivo final
+seqs_verificar <- readDNAStringSet("genbank_ITS2_dada2_format.fasta")
+head(names(seqs_verificar))
+```
+
+##Paso 10: Combinar con UNITE
+```{r, echo=FALSE}
+library(Biostrings)
+#library(dada2)
+
+# Cargar UNITE (ya viene en formato DADA2)
+unite <- readDNAStringSet("sh_general_release_dynamic_19.02.2025.fasta")
+cat("Secuencias UNITE:", length(unite), "\n")
+
+# Cargar tus referencias de GenBank reformateadas
+genbank <- readDNAStringSet("genbank_ITS2_dada2_format.fasta")
+cat("Secuencias GenBank:", length(genbank), "\n")
+
+# Combinar
+base_final <- c(unite, genbank)
+cat("Total combinado:", length(base_final), "\n")
+
+# Eliminar duplicados por header completo
+base_final_unica <- base_final[!duplicated(names(base_final))]
+cat("Total únicas:", length(base_final_unica), "\n")
+
+# Guardar base final
+writeXStringSet(base_final_unica, "base_ITS2_UNITE_GenBank_DADA2.fasta")
+cat("✓ Base final lista\n")
+
+```
+

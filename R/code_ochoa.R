@@ -416,7 +416,8 @@ allpenASV <- add_refseq(penrel, tag = "ASV")
 ### Add best taxonomy level possible to each ASV
 allpenASV <- format_to_besthit(allpenASV)
 
-# Core tresholds: minimum ASV relative abundance 0.001 % minimum prevalence among samples 90%
+# Core tresholds: minimum ASV relative abundance 0.001 % 
+#minimum prevalence among samples 90%
 
 #Among all samples
 full_core <- core(allpenASV, detection = 0.001, prevalence = .9)

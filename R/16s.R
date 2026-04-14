@@ -1079,6 +1079,7 @@ emmeans(modelo_mixto, ~ condicion * sexo)
 
 
 
+
 modglm2 = glm(diversity_shannon ~ especies * tratamiento, 
               family = gaussian(link = "identity"), data = machos_alfa_to)
 summary(modglm2)

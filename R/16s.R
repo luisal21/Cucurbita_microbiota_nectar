@@ -908,6 +908,22 @@ df.pd5 <- pd(t(ps0.rar.asvtab22), ps0.rar.tree22,include.root=T)
 div.df5$Phylogenetic_Diversity <- df.pd5$PD
 head(div.df5)
 
+### DIVERSIDAD ALPHA TOTAL
+head(div.df5)
+sort(div.df5$observed)
+sort(div.df5$diversity_shannon)
+sort(div.df5$Phylogenetic_Diversity)
+#Histograma
+hist(div.df5$observed)
+hist(div.df5$diversity_shannon)
+hist(div.df5$Phylogenetic_Diversity)
+# #shapiro
+shapiro.test(div.df5$observed)
+shapiro.test(div.df5$diversity_shannon)
+shapiro.test(div.df5$Phylogenetic_Diversity)
+
+
+
 
 #### Diversidad alpha en flores hembra ####
 head(div.df5)
@@ -948,18 +964,154 @@ shapiro.test(machos_alfa_to$Phylogenetic_Diversity)
 
 
 ## STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
+# Ver cuántas observaciones tienes por celda
+div.df5 %>%
+  group_by(condicion, especies, tratamiento, sexo) %>%
+  summarise(n = n()) %>%
+  print(n = Inf)
+
+# Resumen del desbalance por sexo
+div.df5 %>%
+  group_by(especies, sexo) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = sexo, 
+                     values_from = n,
+                     values_fill = 0)
+
+# Excluyendo CF de machos
+div.df6 <- div.df5 %>%
+  filter(especies != "1CF")
+
+
 #### Opción con función GLM base (considerando Especie como efecto fijo) ####
-# Flores Macho
-modglm1 <- glm(diversity_shannon ~ condicion / especies * tratamiento, 
-              family = gaussian(link = "identity"), data = machos_alfa_to)
+# TOTAL
+modglm1 <- glm(diversity_shannon ~ condicion / especies * sexo * tratamiento, 
+              family = gaussian(link = "identity"), data = div.df6)
 summary(modglm1)
-anova(modglm1)
+library(car)
+Anova(modglm1)
+Anova(modglm1, type = "III")
+
+
+# Correr el modelo con sexo solo para especies que tienen ambos sexos
+df_con_ambos_sexos <- div.df5 %>%
+  filter(especies != "1CF")
+
+modelo_sexo <- lm(diversity_shannon ~ condicion * sexo +
+                    condicion * tratamiento +
+                    sexo * tratamiento +
+                    especies %in% condicion,
+                  data = df_con_ambos_sexos)
+
+Anova(modelo_sexo, type = "III", singular.ok = TRUE)
+
+
+modelo_simple <- lm(Shannon ~ Tipo * Tratamiento +
+                      Tipo * Sexo +
+                      Tratamiento * Sexo +
+                      Especie %in% Tipo,
+                    data = df)
+
+Anova(modelo_simple, type = "III")
+
+
+# Nota: mencionar en metodología que 1CF se excluyó
+# del análisis de sexo por ausencia de flores hembra
+
+
+
+
+# Ver cuáles coeficientes son NA
+coef_na <- names(which(is.na(coef(modglm1))))
+cat("Coeficientes aliados:\n")
+print(coef_na)
+
+
+modelo_sin_esp <- glm(diversity_shannon ~ condicion * tratamiento * sexo,
+                      family = gaussian(link = "identity"), data = div.df5)
+
+# Verificar supuestos
+par(mfrow = c(2,2))
+plot(modelo_sin_esp)
+
+# Ver el R² para saber cuánta variación explica el modelo
+summary(modelo_sin_esp)$r.squared
+
+# Comparar AIC con modelo mixto
+library(lme4)
+library(lmerTest)
+
+modelo_mixto <- lmer(diversity_shannon ~ condicion * tratamiento * sexo +
+                       (1 | especies),
+                     data = div.df5 %>% filter(especies != "1CF"))
+
+AIC(modelo_sin_esp, modelo_mixto)
+
+
+
+
+# Este es tu modelo final
+modelo_mixto <- lmer(diversity_shannon ~ condicion * sexo * tratamiento +
+                       (1 | especies),
+                     data = div.df5 %>% filter(especies != "1CF"))
+
+# Resultados
+anova(modelo_mixto) # efectos fijos con Tipo III
+#Anova(modelo_mixto, type = "III")
+summary(modelo_mixto)     # resumen completo
+
+# Post-hoc
+library(emmeans)
+emmeans(modelo_mixto, pairwise ~ condicion * sexo)
+
+# Descomponer la interacción condicion × sexo
+emm_condicion_sexo <- emmeans(modelo_mixto, 
+                              pairwise ~ sexo | condicion)
+summary(emm_condicion_sexo)
+
+# También verlo al revés
+emmeans(modelo_mixto, pairwise ~ condicion | sexo)
+
+# Ver las medias estimadas
+emmeans(modelo_mixto, ~ condicion * sexo)
+
+
+
 
 
 modglm2 = glm(diversity_shannon ~ especies * tratamiento, 
               family = gaussian(link = "identity"), data = machos_alfa_to)
 summary(modglm2)
 anova(modglm2)
+
+
+
+# Paso 1: Modelo sin factores adicionales
+# para ver efecto bruto de especie
+modelo_solo_esp <- lm(diversity_shannon ~ especies,
+                      data = div.df5 %>% filter(especies != "1CF"))
+anova(modelo_solo_esp)
+
+# Paso 2: Modelo controlando por factores significativos
+# para ver efecto de especie ajustado
+modelo_esp_completo <- lm(diversity_shannon ~ especies * tratamiento * sexo,
+                          data = div.df5 %>% filter(especies != "1CF"))
+anova(modelo_esp_completo)
+
+mode4 = lm(diversity_shannon ~ condicion,
+           data = div.df5)
+anova(mode4)
+
+# Paso 3: Comparar si las conclusiones cambian
+AIC(modelo_solo_esp, modelo_esp_completo)
+
+
+
+
+
+
+
+
 
 # Flores Hembra
 modglm3 <- glm(diversity_shannon ~ condicion / especies * tratamiento, 

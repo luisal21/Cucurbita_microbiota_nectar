@@ -82,9 +82,6 @@ s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
                       "ENESMo24-bLVEv416s82"))
 s16_1
 
-
-View(tax_table(s16_1))
-
 # Building phylogenetic tree with the function rtree of package "ape"
 arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)
@@ -2935,5 +2932,11 @@ grafico_taxonomia <- ggplot(df_final, aes(x = condicion, y = Percentage,
 
 # Mostrar gráfico
 grafico_taxonomia
+
+###############################################
+install.packages("tinytex")
+tinytex::install_tinytex()
+tinytex::install_tinytex()
+
 
 

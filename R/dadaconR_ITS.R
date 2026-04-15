@@ -557,7 +557,67 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
   geom_smooth(method="lm", se = FALSE) +
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
+##############################################################################
+ps_fam_its <- tax_glom(its6, taxrank = "Family", NArm = FALSE)
 
+# B. Transformar a abundancia relativa
+ps_rel_its <- transform_sample_counts(ps_fam_its, function(x) x / sum(x))
+
+# C. Psmelt - cada fila es una muestra × familia
+df_melt_its <- psmelt(ps_rel_its) %>%
+  mutate(Family = ifelse(is.na(Family), "Unclassified", 
+                         as.character(Family)))
+
+# D. Top 10 familias más abundantes globalmente
+top10_familias_its <- df_melt_its %>%
+  group_by(Family) %>%
+  summarise(AbundMedia = mean(Abundance)) %>%
+  slice_max(order_by = AbundMedia, n = 10) %>%
+  pull(Family)
+
+# E. Colapsar el resto en "Other" por muestra
+df_final_its <- df_melt_its %>%
+  mutate(Taxonomy_Display = ifelse(Family %in% top10_familias_its,
+                                   Family, "Other")) %>%
+  group_by(Sample, especie, Taxonomy_Display) %>%
+  summarise(Percentage = sum(Abundance) * 100, .groups = "drop")
+
+# F. Ordenar factores
+taxa_names_its <- sort(setdiff(unique(df_final_its$Taxonomy_Display), "Other"))
+df_final_its$Taxonomy_Display <- factor(df_final_its$Taxonomy_Display,
+                                    levels = c(taxa_names_its, "Other"))
+
+# G. Ordenar muestras por especie para que queden agrupadas
+df_final_its <- df_final_its %>%
+  arrange(especie, Sample)
+df_final_its$Sample <- factor(df_final_its$Sample, 
+                          levels = unique(df_final_its$Sample))
+
+# H. Paleta de colores
+n_colors_its <- length(unique(df_final_its$Taxonomy_Display))
+getPalette_its <- colorRampPalette(brewer.pal(12, "Paired"))
+custom_colors_its <- getPalette_its(n_colors_its)
+names(custom_colors_its) <- levels(df_final_its$Taxonomy_Display)
+custom_colors_its["Other"] <- "#D3D3D3"
+
+# I. Gráfica por muestra
+grafico_muestras_its <- ggplot(df_final_its,
+                           aes(x = Sample,
+                               y = Percentage,
+                               fill = Taxonomy_Display)) +
+  geom_bar(stat = "identity", position = "stack",
+           color = NA) +  # sin borde para 227 muestras
+  scale_fill_manual(values = custom_colors_its) +
+  labs(x    = "Sample",
+       y    = "Relative Abundance (%)",
+       fill = "Family") +
+  theme_classic() +
+  theme(axis.text.x   = element_blank(),  # ocultar nombres de muestras
+        axis.ticks.x  = element_blank(),  # son 227, no caben
+        axis.title    = element_text(size = 12, face = "bold"),
+        legend.text   = element_text(size = 9))
+
+print(grafico_muestras_its)
 ##############################################################################
 # Separando por sexos florales
 hembras_its <- subset_samples(its6, sexo == "hembra")
@@ -1005,7 +1065,7 @@ ggsave("heatmaps_abril2026.pdf",
        units = "cm")
 
 # Most dominant families en todas las muestras
-domiits <- dominant_taxa(its7, level = "Family") #group = "especies"
+domiits <- dominant_taxa(its6, level = "Family") #group = "especies"
 View(domiits$dominant_overview)
 write.csv(domiits$dominant_overview, file = "dominant_overview_its.csv")
 
@@ -1192,23 +1252,285 @@ df.pd3 <- pd(t(ps0.rar.asvtab3), ps0.rar.tree3,include.root=T)
 div.df3$Phylogenetic_Diversity <- df.pd3$PD
 head(div.df3)
 
-#### Diversidad alpha en flores hembra ####
+#### Diversidad alpha ####
 head(div.df3)
-hembras_alfa_its = subset(div.df3, sexo == "hembra")
-str(hembras_alfa_its)
+str(div.df3)
 
 # data
-sort(hembras_alfa_its$observed)
-hembras_alfa_its$diversity_shannon
-hembras_alfa_its$Phylogenetic_Diversity
+sort(div.df3$observed)
+div.df3$diversity_shannon
+div.df3$Phylogenetic_Diversity
 # Histograma
-hist(hembras_alfa_its$observed)
-hist(hembras_alfa_its$diversity_shannon) 
-hist(hembras_alfa_its$Phylogenetic_Diversity)
+hist(div.df3$observed)
+hist(div.df3$diversity_shannon) 
+hist(div.df3$Phylogenetic_Diversity)
 # Shapiro test
-shapiro.test(hembras_alfa_its$observed)
-shapiro.test(hembras_alfa_its$diversity_shannon)
-shapiro.test(hembras_alfa_its$Phylogenetic_Diversity)
+shapiro.test(div.df3$observed)
+shapiro.test(div.df3$diversity_shannon)
+shapiro.test(div.df3$Phylogenetic_Diversity)
+
+### STATISTICAL ANALYSIS ###
+modits <- glm(diversity_shannon ~ condicion * sexo * tratamiento, 
+               family = gaussian(link = "identity"), data = div.df3)
+summary(modits)
+
+library(car)
+Anova(modits)
+
+# POST HOC
+library(emmeans)
+# Comparar tratamiento dentro de cada combinación condicion:sexo
+emmeans(modits, pairwise ~ tratamiento | condicion * sexo)
+
+# Esto te permitirá ver en qué combinaciones específicas el tratamiento tiene
+# efecto sobre la diversidad de hongos.
+ggplot(div.df3, aes(x = tratamiento, y = diversity_shannon, 
+                      color = sexo, group = sexo)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  facet_wrap(~ condicion) +
+  theme_bw() +
+  labs(title = "Interacción triple: condición × sexo × tratamiento",
+       y = "Índice de Shannon")
+
+################################################################################
+################# GRÁFICAS DE INDICE DE SHANNON EN HONGOS ######################
+##### VISUALIZATION  OF ALPHA DIVERSITY BY CONDITION####
+sha_con_its = ggplot(div.df3, aes(x=condicion, y=diversity_shannon,
+                              fill=condicion)) +
+  geom_boxplot(alpha = 0.8)+
+  #geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Condition", y = "Shannon diversity index")+
+  scale_fill_discrete(name = "Condition", 
+                      labels = c("domesticada" = "Domesticated",
+                                 "silvestre" = "Wild"),
+                      palette = c("#E6AB02","#4D9221"))+
+  scale_x_discrete(labels=c("domesticada" = "Domesticated","silvestre" = "Wild"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+
+sha_con_its
+
+##### VISUALIZATION  OF ALPHA DIVERSITY BY SEX ####
+sha_sex_its = ggplot(div.df3, aes(x=sexo, y=diversity_shannon,
+                              fill=sexo)) +
+  geom_boxplot(alpha = 0.8)+
+  #geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Floral sex", y = "Shannon diversity index")+
+  scale_fill_discrete(name = "Floral sex", 
+                      labels = c("hembra" = "Pistillate",
+                                 "macho" = "Staminate"),
+                      palette = c("#E6AB02","#4D9221"))+
+  scale_x_discrete(labels=c("hembra" = "Pistillate","macho" = "Staminate"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+
+sha_sex_its
+
+##### VISUALIZATION  OF ALPHA DIVERSITY BY TREATMENT #####
+library(ggsignif)
+
+sha_tra_its <- ggplot(div.df3, aes(x = tratamiento, y = diversity_shannon,
+                               fill = tratamiento)) +
+  geom_boxplot(alpha = 0.8) +
+  geom_signif(
+    comparisons = list(c("t1", "t2")),  # grupos a comparar
+    annotation = "*",                   # texto: *, **, ***, ns, o p-value
+    tip_length = 0.001,                   # longitud de las patitas
+    y_position = max(div.df3$diversity_shannon) * .96  # altura de la barra
+  ) +
+  scale_fill_manual(name = "Treatment",
+                    values = c("t1" = "#E6AB02", "t2" = "#4D9221"),
+                    labels = c("t1" = "Unvisited", "t2" = "Visited")) +
+  scale_x_discrete(labels = c("t1" = "Unvisited", "t2" = "Visited")) +
+  labs(x = "Treatment", y = "Shannon diversity index") +
+  theme_classic()
+
+sha_tra_its
+
+# combinando plots
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+
+shato3 <- ggarrange(sha_con_its, sha_sex_its, sha_tra_its, 
+                    ncol = 1, nrow = 3,
+                    labels = "AUTO")
+shato3
+
+######## BOXPLOT CONDITION X SEX  ################
+
+sha_conxsex_its <- ggplot(div.df3, aes(x = condicion, y = diversity_shannon,
+                                   fill = sexo)) +
+  geom_boxplot(alpha = 0.8) +
+  
+  # Asterisco SOLO en domesticadas (hembra vs macho)
+  geom_signif(
+    xmin = 0.8,          # borde izquierdo de la barra (caja hembra en domesticada)
+    xmax = 1.2,          # borde derecho de la barra (caja macho en domesticada)
+    y_position = max(div.df5$diversity_shannon, na.rm = TRUE) * 1.05,
+    annotation = "**",   # p = 0.009
+    tip_length = 0.02
+  ) +
+  
+  scale_fill_manual(name = "Floral sex",
+                    values = c("hembra" = "#E6AB02", "macho" = "#4D9221"),
+                    labels = c("hembra" = "Pistillate",
+                               "macho"  = "Staminate")) +
+  scale_x_discrete(labels = c("domesticada" = "Domesticated",
+                              "silvestre"   = "Wild")) +
+  labs(x = "Condition", y = "Shannon diversity index") +
+  theme_classic()
+
+sha_conxsex
+
+
+####### CONDITION X SPECIES ########
+mod_spp_its = glm(diversity_shannon ~ especie,
+              data = div.df3, family = gaussian)
+Anova(mod_spp_its)
+## Post-hoc
+library(emmeans)
+emmeans(mod_spp, pairwise ~ especies)
+
+# Gráfica
+# Dataframe con las letras y posiciones
+# y_pos debe estar encima de cada boxplot
+letras_df <- data.frame(
+  especies = c("1CF", "2CPF", "3CAS", "4CPP", "5CAA", "6CM"),
+  letra    = c("ab",  "ab",   "b",    "b",    "a",    "b"),
+  # calcular posición y encima del máximo de cada especie
+  y_pos = tapply(div.df5$diversity_shannon,
+                 div.df5$especies,
+                 function(x) max(x, na.rm = TRUE)) + 0.15
+)
+
+sha_spp <- ggplot(div.df5, aes(x = especies, y = diversity_shannon,
+                               fill = condicion)) +
+  geom_boxplot(alpha = 0.8) +
+  
+  # Letras de significancia
+  geom_text(data = letras_df,
+            aes(x = especies, y = y_pos, label = letra),
+            inherit.aes = FALSE,
+            size = 4) + #fontface = "bold"
+  
+  scale_fill_manual(name = "Condition",
+                    values = c("domesticada" = "#E6AB02",
+                               "silvestre"   = "#4D9221"),
+                    labels = c("domesticada" = "Domesticated",
+                               "silvestre"   = "Wild")) +
+  scale_x_discrete(labels = c("1CF"  = "CF",
+                              "2CPF" = "CPF",
+                              "3CAS" = "CAS",
+                              "4CPP" = "CPP",
+                              "5CAA" = "CAA",
+                              "6CM"  = "CM")) +
+  labs(x = "Species",
+       y = "Shannon diversity index") +
+  theme_classic()
+#theme(axis.text.x = element_text(face = "italic"))
+
+sha_spp
+
+
+####### SEX X SPECIES ########
+mod_sexXspp = glm(diversity_shannon ~ especies * sexo,
+                  data = div.df5, family = gaussian)
+Anova(mod_sexXspp)
+## Post-hoc
+library(emmeans)
+emmeans(mod_sexXspp, pairwise ~ sexo | especies)
+
+# Gráfica
+sha_sppxsex = ggplot(div.df5, aes(x=especies, y=diversity_shannon,
+                                  fill=sexo)) +
+  geom_boxplot(alpha = 0.8)+
+  #geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_fill_discrete(name = "Floral sex", 
+                      labels = c("hembra" = "Pistillate",
+                                 "macho" = "Staminate"),
+                      palette = c("#E6AB02","#4D9221"))+
+  scale_x_discrete(labels=c("1CF"="CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+
+sha_sppxsex
+
+####### TREATMENT X SPECIES ########
+mod_traXspp = glm(diversity_shannon ~ especies * tratamiento,
+                  data = div.df5, family = gaussian)
+Anova(mod_traXspp)
+## Post-hoc
+library(emmeans)
+emmeans(mod_traXspp, pairwise ~ tratamiento | especies)
+# Gráfica
+sha_sppxtreat = ggplot(div.df5, aes(x=especies, y=diversity_shannon,
+                                    fill=tratamiento)) +
+  geom_boxplot(alpha = 0.8)+
+  #geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Shannon diversity index")+
+  scale_fill_discrete(name = "Treatment", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  scale_x_discrete(labels=c("1CF"="CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  theme_classic()
+
+sha_sppxtreat
+
+# Calcular posiciones y encima de cada especie
+y_max_spp <- div.df5 %>%
+  group_by(especies) %>%
+  summarise(y_pos = max(diversity_shannon, na.rm = TRUE) + 0.15)
+
+sha_sppxtreat <- ggplot(div.df5, aes(x = especies, y = diversity_shannon,
+                                     fill = tratamiento)) +
+  geom_boxplot(alpha = 0.8) +
+  
+  # Asterisco en 4CPP (significativa p = 0.024)
+  # 4CPP es la 4ta especie → posición x = 4
+  # t1 (unvisited) = 4 - 0.2 = 3.8
+  # t2 (visited)   = 4 + 0.2 = 4.2
+  geom_signif(
+    xmin       = 3.8,
+    xmax       = 4.2,
+    y_position = y_max_spp$y_pos[y_max_spp$especies == "4CPP"],
+    annotation = "*",
+    tip_length = 0.02,
+    size       = 0.5,
+    textsize   = 5
+  ) +
+  
+  scale_fill_manual(name   = "Treatment",
+                    values = c("t1" = "#E6AB02", "t2" = "#4D9221"),
+                    labels = c("t1" = "Unvisited", "t2" = "Visited")) +
+  scale_x_discrete(labels = c("1CF"  = "CF",
+                              "2CPF" = "CPF",
+                              "3CAS" = "CAS",
+                              "4CPP" = "CPP",
+                              "5CAA" = "CAA",
+                              "6CM"  = "CM")) +
+  labs(x       = "Species",
+       y       = "Shannon diversity index") +
+  theme_classic() +
+  theme(plot.caption = element_text(hjust = 0, size = 9))
+
+sha_sppxtreat
+###############################################################################
+###############################################################################
 
 #### Diversidad alpha en flores macho ####
 head(div.df3)
@@ -1442,15 +1764,15 @@ machos_its
 # Primero nos aseguramos que estamos usando las funciones del paquete correcto
 transform <- microbiome::transform
 # Proportion Normalization
-its_hem <- transform(hembras_its, "compositional")
+its_beta <- transform(its6, "compositional")
 
 
 # PCoA plot using the unweighted UniFrac as distance
-ordination_its_hem = ordinate(its_hem, method="PCoA", "unifrac",
+ordination_its = ordinate(its_beta, method="PCoA", "unifrac",
                               weighted = F)
 
-baseplot_its_hem <- plot_ordination(its_hem, ordination_its_hem,
-                                    color="especie",
+baseplot_its <- plot_ordination(its_beta, ordination_its,
+                                    color="condicion",
                                     type = "samples",
 ) + #shape = "sexo"
   ggtitle("")+
@@ -1459,7 +1781,7 @@ baseplot_its_hem <- plot_ordination(its_hem, ordination_its_hem,
   geom_point(size = 2)
 #stat_ellipse()
 
-baseplot_its_hem
+baseplot_its
 
 #baseplot_16s_hem +
 #  geom_point(size = 1)
@@ -1488,34 +1810,35 @@ baseplot_its_mac <- plot_ordination(its_mac, ordination_its_mac,
 baseplot_its_mac
 
 
-#### Weighted UniFrac HEMBRAS####
+#### Weighted UniFrac####
 # PCoA plot using the weighted UniFrac as distance
-ordination_its_hem_wei = ordinate(its_hem,
+ordination_its_wei = ordinate(its_beta,
                                   method="PCoA", "wunifrac")
 # Plot
-baseplot_its_hem_wei <- plot_ordination(its_hem, 
-                                        ordination_its_hem_wei,
-                                        color="especie",
-                                        shape = "condicion",
+baseplot_its_wei <- plot_ordination(its_beta, 
+                                        ordination_its_wei,
+                                        color="tratamiento",
+                                        #shape = "condicion",
                                         type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("")+
   theme(aspect.ratio=1)+
   theme_bw()+
   geom_point(size = 4)+
-  scale_color_discrete(name = "Species", 
-                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
-                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
-                       palette = "Set1")+
-  scale_shape_discrete(name = "Condition",
-                       labels = c("domesticada" = "Domesticated",
-                                  "silvestre" = "Wild"))
+  #scale_color_discrete(name = "Species", 
+   #                    labels = c("2CPF" = "CPF","3CAS" = "CAS",
+    #                              "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+     #                  palette = "Set1")+
+  scale_color_discrete(name = "Treatment",
+                       labels = c("t1" = "Unvisited",
+                                  "t2" = "Visited"),
+                       palette = c("#E6AB02","#4D9221"))
 #labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
 #scale_color_discrete(name = "Condition", 
 #                    labels = c("Domesticated","Wild"))+
 #scale_color_discrete(name = "Treatment",
 #                     labels = c("No-visited","Visited"))
 
-baseplot_its_hem_wei
+baseplot_its_wei + stat_ellipse(linetype = 2)
 
 #baseplot_its_hem_wei + stat_ellipse()
 #
@@ -1596,10 +1919,10 @@ permutest(disp_wun_its)
 
 
 ## Male flowers
-metadf_mac_its = data.frame(sample_data(machos_its))
+metadf_its = data.frame(sample_data(its_beta))
 
 # calculating Weighted-UniFrac
-wunifrac.dist_its_mac <- UniFrac(its_mac, 
+wunifrac.dist_its <- UniFrac(its_beta, 
                              weighted = TRUE, 
                              normalized = TRUE,  
                              parallel = FALSE, 
@@ -1607,16 +1930,16 @@ wunifrac.dist_its_mac <- UniFrac(its_mac,
 
 # Run PERMANOVA
 set.seed(100)   # Set the seed to make the analysis reproducible
-perm_mac_its = adonis2(wunifrac.dist_its_mac ~ condicion / especie * tratamiento,
-                       data = metadf_mac_its,
+perm_its = adonis2(wunifrac.dist_its ~ condicion * sexo * tratamiento,
+                       data = metadf_its,
                    by = "terms", permutations = 999)
-perm_mac_its
+perm_its
 
 
 #Test dispersion among body sites
-disp_wun_mac_its <- betadisper(wunifrac.dist_its_mac,
-                               sample_data(machos_its)$tratamiento)
-permutest(disp_wun_mac_its)
+disp_wun_its <- betadisper(wunifrac.dist_its,
+                               sample_data(metadf_its)$tratamiento)
+permutest(disp_wun_its)
 
 disp_wun_mac_its2 <- betadisper(wunifrac.dist_its_mac,
                                 sample_data(machos_its)$especie)

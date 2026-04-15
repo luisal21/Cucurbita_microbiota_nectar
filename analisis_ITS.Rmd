@@ -1,0 +1,905 @@
+---
+title: "analisis_ITS"
+author: "Luis Alberto Villanueva Espino"
+date: "2026-04-15"
+output: 
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE)
+```
+
+### Primera parte del análisis de post-asignación taxonómica
+```{r}
+#### Analysis post-taxonomic assignation
+### change directory
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
+
+# Cargando paquete phyloseq y paquetes adicionales
+library(phyloseq); packageVersion("phyloseq")
+library(ggplot2)
+library(picante)
+library(ape)
+library("microbiome")
+library("dplyr")
+#library("tidyverse")
+library("RColorBrewer")
+library("ggpubr")
+#library("breakaway") # no instalado
+#library(MicrobiotaProcess)
+#library(reltools)
+library(microbiomeutilities)
+library(vegan)
+library(gridExtra)
+library(tidyr)
+library(reshape2)
+#library(minpack.lm) # no instalado
+library(Hmisc)
+library(stats4)
+
+#library(patchwork) # no instalado
+
+
+### Transponer tabla de ASV
+#seqtab.nochim2 <- read.csv("asv_tabla.csv", header = T, row.names = 1)
+#asvtable <- read.csv("seqtab_nochim_minlen50.csv", header = T, row.names = 1)
+#head(asvtable)
+#asv2 = t(asvtable)
+#head(asv2, 1)
+#write.csv(asv2, file = "asv_table.csv")
+
+# cargar primero el archivo de metadatos
+meta_its <- read.csv("its_metadata_2024.csv", header = T)
+head(meta_its)
+# despues cargar la tabla de ASV
+seqtab.its <- read.csv("asv_table.csv", header = T, row.names = 1)
+head(seqtab.its)
+tail(seqtab.its)
+str(seqtab.its)
+# Debido a que al cargar el archivo agrega una X al principio del nombre de
+# cada columna, hay que decirle que los nombres de las columnas son iguales
+# a las filas de sample_id de metadatos para corregir este error
+colnames(seqtab.its) = meta_its$sample.id
+str(seqtab.its)
+# Volver a cargar archivo de metadatos
+meta_its2 <- read.csv("its_metadata_2024.csv", header = T, row.names = 1)
+head(meta_its2)
+# cargando taxonomia
+taxo_its <-read.csv("taxa_fungi_all_2024.csv", header = T,row.names = 1)
+head(taxo_its)
+# corrobando match entre archivos
+setdiff(rownames(taxo_its), rownames(seqtab.its))
+all(rownames(seqtab.its) == rownames(taxo_its))
+all(colnames(seqtab.its) == unlist(meta_its2[,'sample.id']))
+
+# Construct phyloseq object (straightforward from dada2 outputs)
+its1 <- phyloseq(otu_table(as.matrix(seqtab.its), taxa_are_rows=T),
+               tax_table(as.matrix(taxo_its)), 
+               sample_data(meta_its2))
+its1
+
+# obteniendo el arbol filogenetico
+arbol_its = rtree(ntaxa(its1), rooted=TRUE, tip.label=taxa_names(its1))
+plot(arbol_its)
+# Uniendo el arbol con el objeto phyloseq anterior
+its2 = merge_phyloseq(its1, arbol_its)
+its2
+# Primero resumimos el contenido del objeto phyloseq
+summarize_phyloseq(its2) # reads totales 6,060,868, 1257 ASVs in 364 samples
+# información del número de reads
+summary(sample_sums(its2)) #range of 0 to 31014
+
+# A useful next step is to explore feature prevalence in the dataset,
+# which we will define here as the number of samples in which a taxa appears
+# at least once.
+# Compute prevalence of each feature, store as data.frame
+prevdf_its = apply(X = otu_table(its2),
+                   MARGIN = ifelse(taxa_are_rows(its2), yes = 1, no = 2),
+                   FUN = function(x){sum(x > 0)})
+# Add taxonomy and total read counts to this data.frame
+prevdf_its = data.frame(Prevalence = prevdf_its,
+                        TotalAbundance = taxa_sums(its2),
+                        tax_table(its2))
+# Revisando prevalencia por phylum
+plyr::ddply(prevdf_its, "Phylum", function(df1)
+{cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
+
+# Filtering phyla whose prevalence is 1 (only present in one sample)
+filterPhyla_its = c("p__Bryophyta","p__Chytridiomycota", "p__Monilophyta"
+                    ,"p__Mortierellomycota")
+# Filter entries with low prevalence Phylum.
+its3 = subset_taxa(its2, !Phylum %in% filterPhyla_its)
+its3 # Final ASV data set: 1253 ASVs in 364 samples
+
+
+# Filtering samples of Morelia site
+its4 = subset_samples(its3, sitio == "morelia")
+summarize_phyloseq(its4)  #3,796,606 reads, 1253 ASVs de 236 samples
+##### Extraemos todas aquellas secuencias del reino Fungi #####
+its4 = subset_taxa(its4, Kingdom == "k__Fungi")
+its4
+# Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
+# pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
+# muestras que quedaron con 0 secuencias:
+its5 = prune_samples(sample_sums(its4)>1, its4)
+its5
+
+#Remove taxa with 0 observation
+its6 <- prune_taxa(taxa_sums(its5) > 0, its5)
+its6
+summarize_phyloseq(its6) #16692 reads, 210 ASVs in 178 samples
+sort(sample_sums(its6))
+
+# información del número de reads
+summary(sample_sums(its6))
+range(sample_sums(its6))
+#Library size spans 2 - 2873 reads 
+
+# Obteniendo el número de read por muestra
+reads_sample = readcount(its6)
+reads_sample[1:5]
+#write.csv(reads_sample, file = "reads_sample_its_todas.csv")
+
+
+# Get count of phyla
+table(phyloseq::tax_table(its6)[,"Phylum"])
+# Convert to relative abundance
+ps_rel_abund = phyloseq::transform_sample_counts(its6, function(x)
+  {x / sum(x)})
+phyloseq::otu_table(its6)[1:5, 1:5]
+phyloseq::otu_table(ps_rel_abund)[1:5, 1:5]
+
+#### grafica de abundancia con phyloseq
+# creamos una primera visualización de la abundancia total de secuencias por
+# muestra a nivel de Phylum
+plot_bar(its6, fill = "Phylum") +
+  geom_bar(aes(color = Phylum), stat = "identity",
+           position = "stack")
+# abundancia total de secuencias a nivel de Order
+plot_bar(its6, fill = "Order") +
+  geom_bar(aes(color = Order), stat = "identity",
+           position = "stack")
+# abundancia total de secuencias a nivel de Order
+plot_bar(its6, fill = "Family") +
+  geom_bar(aes(color = Family), stat = "identity",
+           position = "stack")
+
+# Abundancia relativa a nivel de Phylum
+plot_bar(ps_rel_abund, fill = "Phylum") +
+  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+# Abundancia relativa a nivel de Class
+plot_bar(ps_rel_abund, fill = "Class") +
+  geom_bar(aes(color = Class), stat = "identity", position = "stack")
+
+# Elimando NAs a nivel de phylum
+#its2_4 = subset_taxa(its2_3, Phylum != "NA")
+#its2_4
+#
+#its2_4_re  = transform_sample_counts(its2_4, function(x) x / sum(x) )
+#its2_4_re
+
+#plot_bar(its2_4_re, fill="Phylum") +
+#  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+
+# eliminando muestras sin secuencias
+#its2_5 = prune_samples(sample_sums(its2_4)>1, its2_4)
+#its2_5
+#otu_table(its2_5)
+#View(otu_table(its2_5))
+
+#its2_5_re  = transform_sample_counts(its2_5, function(x) x / sum(x) )
+#its2_5_re
+#plot_bar(its2_5_re, fill="Phylum") +
+#  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
+
+# checking correlation between reads and ASVs observados
+ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
+                         "observed" = phyloseq::estimate_richness(its6,
+                           measures = "Observed")[, 1]),
+       aes(x = total_reads, y = observed)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE) +
+  labs(x = "\nTotal Reads", y = "Observed Richness\n")
+
+```
+
+### Composición taxonómica
+```{r}
+# Separando por sexos florales
+hembras_its <- subset_samples(its6, sexo == "hembra")
+hembras_its
+machos_its <- subset_samples(its6, sexo == "macho")
+machos_its
+
+###### HEMBRAS ####
+# Ver si hay familias duplicadas con diferente contexto taxonómico
+tax_table(hembras_its) %>%
+  as.data.frame() %>%
+  group_by(Family) %>%
+  summarise(
+    n_phyla = n_distinct(Phylum),
+    n_class = n_distinct(Class),
+    n_order = n_distinct(Order)
+  ) %>%
+  filter(n_order > 1 | n_class > 1) %>%
+  print(n = Inf)
+
+# Reemplazar NAs en TODA la tax_table, no solo en Family
+tax <- tax_table(hembras_its) %>% as.data.frame()
+
+# Reemplazar NA en cada nivel taxonómico
+tax <- tax %>%
+  mutate(across(everything(), ~ifelse(is.na(.), "Unclassified", .)))
+
+# Para los que tienen Family = "Unclassified", estandarizar
+# toda su jerarquía superior para que tax_glom los fusione
+tax <- tax %>%
+  mutate(
+    Phylum = ifelse(Family == "Unclassified", "Unclassified", Phylum),
+    Class  = ifelse(Family == "Unclassified", "Unclassified", Class),
+    Order  = ifelse(Family == "Unclassified", "Unclassified", Order)
+  )
+
+# Devolver la tax_table al objeto phyloseq
+tax_table(hembras_its) <- tax_table(as.matrix(tax))
+
+# Verificar que ahora todos los Unclassified tienen jerarquía homogénea
+tax_table(hembras_its) %>%
+  as.data.frame() %>%
+  group_by(Family) %>%
+  summarise(
+    n_phyla = n_distinct(Phylum),
+    n_class = n_distinct(Class),
+    n_order = n_distinct(Order)
+  ) %>%
+  filter(n_order > 1 | n_class > 1)
+# Debería devolver tibble vacío (0 filas)
+
+# Visualizar tabla modificada
+View(tax_table(hembras_its))
+
+# 1. Preparación del objeto Phyloseq
+# A. Aglomerar a nivel de Familia. Esto suma los reads de todos los ASVs/OTUs
+# que pertenecen a la misma familia. Reduce la complejidad drásticamente.
+ps_fam_itsh <- tax_glom(hembras_its, taxrank = "Family", NArm = FALSE)
+
+# B. Transformar a abundancia relativa (escala 0-1)
+# Esto estandariza las muestras independientemente de su profundidad de secuenciación.
+ps_rel_itsh <- transform_sample_counts(ps_fam_itsh, function(x) x / sum(x))
+
+# C. Convertir el objeto phyloseq a un dataframe largo ('melted' dataframe)
+df_melt_itsh <- psmelt(ps_rel_itsh)
+View(df_melt_itsh)
+
+# D. Agrupar por Especie y Familia, y calcular la abundancia relativa PROMEDIO
+# para esa especie de planta.
+#library(dplyr)
+df_grouped_itsh <- df_melt_itsh %>%
+  dplyr::group_by(especie, Family) %>% 
+  dplyr::summarize(MeanRelAbund = mean(Abundance), .groups = "drop")
+# Visualizar tabla 
+View(df_grouped_itsh)
+write.csv(df_grouped_itsh, file = "abundancias_its_ABRIL-2026.csv")
+
+# Verificar que ahora suma 100%
+df_grouped_itsh %>%
+  group_by(especie) %>%
+  summarise(total = sum(MeanRelAbund) * 100)
+
+# E. Identificar el Top 5 de familias más abundantes POR ESPECIE.
+# Usamos slice_max para quedarnos con las 5 filas con mayor abundancia promedio por grupo.
+top10_per_species_itsh <- df_grouped_itsh %>%
+  group_by(especie) %>%
+  slice_max(order_by = MeanRelAbund, n = 5, with_ties = FALSE) %>%
+  mutate(Classification = Family) %>% # Guardamos el nombre para el cruce
+  ungroup()
+
+# F. Crear la categoría "Otras".
+# Cruzamos la tabla agrupada completa con la tabla del Top 10.
+df_final_itsh <- df_grouped_itsh %>%
+  left_join(select(top10_per_species_itsh, especie, Family, Classification), 
+            by = c("especie", "Family")) %>%
+  # Si la familia NO estaba en el top10 (Classification es NA), la llamamos "Otras"
+  dplyr::mutate(Taxonomy_Display = ifelse(is.na(Classification), 
+                                          "Otras", 
+                                          as.character(Family))) %>%
+  # Volvemos a agrupar y sumar para colapsar todas las "Otras" en una sola fila por especie
+  dplyr::group_by(especie, Taxonomy_Display) %>%
+  dplyr::summarize(TotalMeanAbund = sum(MeanRelAbund), .groups = 'drop') %>%
+  # Convertir abundancia relativa (0-1) a porcentaje (0-100) para el gráfico
+  dplyr::mutate(Percentage = TotalMeanAbund * 100)
+View(df_final_itsh)
+write.csv(df_final_itsh, file = "abundancias_family_hembrasITS_abril2026.csv")
+
+# 3. Preparación para Graficar
+# ==============================================================================
+
+# G. Ordenar los factores para que "Otras" siempre aparezca abajo en la barra y leyenda.
+# Primero obtenemos todos los nombres únicos excepto "Otras" y los ordenamos alfabéticamente
+taxa_names_itsh <- sort(setdiff(unique(df_final_itsh$Taxonomy_Display), "Otras"))
+# Creamos el factor con "Otras" al final
+df_final_itsh$Taxonomy_Display <- factor(df_final_itsh$Taxonomy_Display, 
+                                    levels = c(taxa_names_itsh, "Otras"))
+
+# H. Definir una paleta de colores. El Top 10 por especie puede generar
+# fácilmente entre 15 y 30 familias únicas en total para graficar.
+# Necesitamos una paleta grande.
+n_colors_itsh <- length(unique(df_final_itsh$Taxonomy_Display))
+getPalette_itsh = colorRampPalette(brewer.pal(12, "Paired"))
+custom_colors_itsh <- getPalette_itsh(n_colors_itsh)
+
+
+# Asignar explícitamente el color gris a "Otras"
+names(custom_colors_itsh) <- levels(df_final_itsh$Taxonomy_Display)
+custom_colors_itsh["Otras"] <- "#D3D3D3" # Gris claro
+custom_colors_itsh["Unclassified"] <- "#404040" # Gris oscuro/Casi negro para las desconocidas
+
+
+# 4. Visualización con GGPLOT2
+# ==============================================================================
+
+grafico_taxonomia_its_H <- ggplot(df_final_itsh, aes(x = especie, y = Percentage,
+                                               fill = Taxonomy_Display)) +
+  # Barras apiladas al 100% (position = "stack")
+  geom_bar(stat = "identity", position = "stack", color = "black",
+           linewidth = 0.2) +
+  
+  # Usar la paleta de colores personalizada
+  scale_fill_manual(values = custom_colors_itsh) +
+  
+  # Etiquetas y formato
+  labs(x = "Species",
+       y = "Relative Abundance (%)",
+       fill = "Family"
+  ) +
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  
+  # Tema limpio para tesis
+  theme_classic() +
+  theme(
+    # Nombres de especies de Cucurbita en cursiva y rotados
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic", size = 11),
+    axis.title = element_text(size = 12, face = "bold"),
+    legend.position = "right",
+    legend.text = element_text(size = 9)
+  )
+
+# Mostrar gráfico
+print(grafico_taxonomia_its_H)
+
+
+#### MACHOS #####
+# Ver si hay familias duplicadas con diferente contexto taxonómico
+tax_table(machos_its) %>%
+  as.data.frame() %>%
+  group_by(Family) %>%
+  summarise(
+    n_phyla = n_distinct(Phylum),
+    n_class = n_distinct(Class),
+    n_order = n_distinct(Order)
+  ) %>%
+  filter(n_order > 1 | n_class > 1) %>%
+  print(n = Inf)
+
+# Reemplazar NAs en TODA la tax_table, no solo en Family
+tax <- tax_table(machos_its) %>% as.data.frame()
+
+# Reemplazar NA en cada nivel taxonómico
+tax <- tax %>%
+  mutate(across(everything(), ~ifelse(is.na(.), "Unclassified", .)))
+
+# Para los que tienen Family = "Unclassified", estandarizar
+# toda su jerarquía superior para que tax_glom los fusione
+tax <- tax %>%
+  mutate(
+    Phylum = ifelse(Family == "Unclassified", "Unclassified", Phylum),
+    Class  = ifelse(Family == "Unclassified", "Unclassified", Class),
+    Order  = ifelse(Family == "Unclassified", "Unclassified", Order)
+  )
+
+# Devolver la tax_table al objeto phyloseq
+tax_table(machos_its) <- tax_table(as.matrix(tax))
+
+# Verificar que ahora todos los Unclassified tienen jerarquía homogénea
+tax_table(machos_its) %>%
+  as.data.frame() %>%
+  group_by(Family) %>%
+  summarise(
+    n_phyla = n_distinct(Phylum),
+    n_class = n_distinct(Class),
+    n_order = n_distinct(Order)
+  ) %>%
+  filter(n_order > 1 | n_class > 1) # Debería devolver tibble vacío (0 filas)
+
+# Visualizar tabla modificada
+View(tax_table(machos_its))
+
+# 1. Preparación del objeto Phyloseq
+# A. Aglomerar a nivel de Familia. Esto suma los reads de todos los ASVs/OTUs
+# que pertenecen a la misma familia. Reduce la complejidad drásticamente.
+ps_fam_itsm <- tax_glom(machos_its, taxrank = "Family", NArm = FALSE)
+
+# B. Transformar a abundancia relativa (escala 0-1)
+# Esto estandariza las muestras independientemente de su profundidad de secuenciación.
+ps_rel_itsm <- transform_sample_counts(ps_fam_itsm, function(x) x / sum(x))
+
+# C. Convertir el objeto phyloseq a un dataframe largo ('melted' dataframe)
+df_melt_itsm <- psmelt(ps_rel_itsm)
+
+# D. Agrupar por Especie y Familia, y calcular la abundancia relativa PROMEDIO
+# para esa especie de planta.
+df_grouped_itsm <- df_melt_itsm %>%
+  dplyr::group_by(especie, Family) %>% 
+  dplyr::summarize(MeanRelAbund = mean(Abundance), .groups = "drop")
+View(df_grouped_itsm)
+
+# Verificar que ahora suma 100%
+df_grouped_itsm %>%
+  group_by(especie) %>%
+  summarise(total = sum(MeanRelAbund) * 100)
+
+# E. Identificar el Top 5 de familias más abundantes POR ESPECIE.
+# Usamos slice_max para quedarnos con las 5 filas con mayor abundancia promedio por grupo.
+top10_per_species_itsm <- df_grouped_itsm %>%
+  group_by(especie) %>%
+  slice_max(order_by = MeanRelAbund, n = 5, with_ties = FALSE) %>%
+  mutate(Classification = Family) %>% # Guardamos el nombre para el cruce
+  ungroup()
+
+# F. Crear la categoría "Otras".
+# Cruzamos la tabla agrupada completa con la tabla del Top 10.
+df_final_itsm <- df_grouped_itsm %>%
+  left_join(select(top10_per_species_itsm, especie, Family, Classification), 
+            by = c("especie", "Family")) %>%
+  # Si la familia NO estaba en el top10 (Classification es NA), la llamamos "Otras"
+  dplyr::mutate(Taxonomy_Display = ifelse(is.na(Classification), 
+                                          "Otras", 
+                                          as.character(Family))) %>%
+  # Volvemos a agrupar y sumar para colapsar todas las "Otras" en una sola fila por especie
+  dplyr::group_by(especie, Taxonomy_Display) %>%
+  dplyr::summarize(TotalMeanAbund = sum(MeanRelAbund), .groups = 'drop') %>%
+  # Convertir abundancia relativa (0-1) a porcentaje (0-100) para el gráfico
+  dplyr::mutate(Percentage = TotalMeanAbund * 100)
+View(df_final_itsm)
+write.csv(df_final_itsm, file = "abundancias_family_machos_abril2026.csv")
+# 3. Preparación para Graficar
+# ==============================================================================
+
+# G. Ordenar los factores para que "Otras" siempre aparezca abajo en la barra y leyenda.
+# Primero obtenemos todos los nombres únicos excepto "Otras" y los ordenamos alfabéticamente
+taxa_names_itsm <- sort(setdiff(unique(df_final_itsm$Taxonomy_Display), "Otras"))
+# Creamos el factor con "Otras" al final
+df_final_itsm$Taxonomy_Display <- factor(df_final_itsm$Taxonomy_Display, 
+                                      levels = c(taxa_names_itsm, "Otras"))
+
+# H. Definir una paleta de colores. El Top 10 por especie puede generar
+# fácilmente entre 15 y 30 familias únicas en total para graficar.
+# Necesitamos una paleta grande.
+n_colors_itsm <- length(unique(df_final_itsm$Taxonomy_Display))
+getPalette_itsm = colorRampPalette(brewer.pal(12, "Paired"))
+custom_colors_itsm <- getPalette_itsm(n_colors_itsm)
+
+# Asignar explícitamente el color gris a "Otras"
+names(custom_colors_itsm) <- levels(df_final_itsm$Taxonomy_Display)
+custom_colors_itsm["Otras"] <- "#D3D3D3" # Gris claro
+
+# 4. Visualización con GGPLOT2
+# ==============================================================================
+
+grafico_taxonomia_its_M <- ggplot(df_final_itsm, aes(x = especie, y = Percentage,
+                                                 fill = Taxonomy_Display)) +
+  # Barras apiladas al 100% (position = "stack")
+  geom_bar(stat = "identity", position = "stack", color = "black",
+           linewidth = 0.2) +
+  
+  # Usar la paleta de colores personalizada
+  scale_fill_manual(values = custom_colors_itsm) +
+  
+  # Etiquetas y formato
+  labs(x = "Species",
+       y = "Relative Abundance (%)",
+       fill = "Family"
+  ) +
+  scale_x_discrete(labels=c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  # Tema limpio para tesis
+  theme_classic() +
+  theme(
+    # Nombres de especies de Cucurbita en cursiva y rotados
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic", size = 11),
+    axis.title = element_text(size = 12, face = "bold"),
+    legend.position = "right",
+    legend.text = element_text(size = 9)
+  )
+
+# Mostrar gráfico
+print(grafico_taxonomia_its_M)
+```
+
+
+### Análisis de diversidad alfa
+```{r}
+#### ALPHA DIVERSITY WITH PROPORTIONS DATA  ####
+#### ANALYSIS WITH PROPORTIONS DATA ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+pseq_its <- transform(its6, "compositional")
+
+library(knitr)
+
+# Obteniendo los valores de las metricas de diversidad alfa
+alpha_its = microbiome::alpha(pseq_its, index = "all")
+tab <- microbiome::alpha(pseq_its, index = c("observed","shannon", "simpson"));tab
+kable(head(tab))
+View(tab)
+
+# get the metadata out as separate object
+its.meta <- meta(its6)
+kable(head(its.meta))
+# Add the rownames as a new colum for easy integration later.
+its.meta$sam_name2 <- rownames(its.meta)
+
+# Add the rownames to diversity table
+tab$sam_name2 <- rownames(tab)
+
+# merge these two data frames into one
+div.df3 <- merge(tab,its.meta, by = "sam_name2")
+
+# check the tables
+colnames(div.df3)
+
+### Phylogenetic diversity (Faith)
+library(picante)
+
+ps0.rar.asvtab3 <- as.data.frame(its6@otu_table)
+
+ps0.rar.tree3 <- its6@phy_tree
+
+# hmp.meta from previous code chunks
+
+# We first need to check if the tree is rooted or not 
+its6@phy_tree
+
+# it is a rooted tree
+df.pd3 <- pd(t(ps0.rar.asvtab3), ps0.rar.tree3,include.root=T) 
+# t(ou_table) transposes the table for use in picante and the tre file comes
+# from the first code chunck we used to read tree file (see making a phyloseq 
+# object section).
+#datatable(df.pd2)
+
+# We add the results of PD to this file and then plot
+div.df3$Phylogenetic_Diversity <- df.pd3$PD
+head(div.df3)
+
+#### Diversidad alpha en flores hembra ####
+head(div.df3)
+hembras_alfa_its = subset(div.df3, sexo == "hembra")
+str(hembras_alfa_its)
+
+# data
+sort(hembras_alfa_its$observed)
+hembras_alfa_its$diversity_shannon
+hembras_alfa_its$Phylogenetic_Diversity
+# Histograma
+hist(hembras_alfa_its$observed)
+hist(hembras_alfa_its$diversity_shannon) 
+hist(hembras_alfa_its$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(hembras_alfa_its$observed)
+shapiro.test(hembras_alfa_its$diversity_shannon)
+shapiro.test(hembras_alfa_its$Phylogenetic_Diversity)
+
+#### Diversidad alpha en flores macho ####
+head(div.df3)
+machos_alfa_its = subset(div.df3, sexo == "macho")
+str(machos_alfa_its)
+head(machos_alfa_its)
+# data
+sort(machos_alfa_its$observed)
+machos_alfa_its$diversity_shannon
+machos_alfa_its$Phylogenetic_Diversity
+# Histograma
+hist(machos_alfa_its$observed)
+hist(machos_alfa_its$diversity_shannon) 
+hist(machos_alfa_its$Phylogenetic_Diversity)
+# Shapiro test
+shapiro.test(machos_alfa_its$observed)
+shapiro.test(machos_alfa_its$diversity_shannon)
+shapiro.test(machos_alfa_its$Phylogenetic_Diversity)
+
+#### STATISTICAL ANALYSIS OF ALPHA DIVERSITY ####
+# Flores Hembra
+modglm5 <- glm(diversity_shannon ~ condicion / especie * tratamiento, 
+               family = gaussian(link = "identity"), data = hembras_alfa_its)
+summary(modglm5)
+anova(modglm5)
+
+# Flores Macho
+modglm6 <- glm(diversity_shannon ~ condicion / especie * tratamiento, 
+               family = gaussian(link = "identity"), data = machos_alfa_its)
+summary(modglm6)
+anova(modglm6)
+
+library(emmeans)
+
+# Asumiendo que tu modelo se llama modelo_shannon
+# La barra "|" le dice a R: "Compara las Especies, pero hazlo POR SEPARADO 
+# dentro de cada Estado"
+# comparaciones con el modelo anidado
+comp5 = emmeans(modglm5,
+                pairwise ~ especie | condicion)
+comp5
+# comparando todas las especies sin anidar
+comp6 <- emmeans(modglm5, pairwise ~ especie)
+comp6
+
+# hembras
+comp7 <- emmeans(modglm6,
+                 pairwise ~ especie | condicion)
+comp7
+# comparando todas las especies sin anidar
+comp8 <- emmeans(modglm6, pairwise ~ especie)
+comp8
+
+
+##### VISUALIZATION  OF ALPHA DIVERSITY WITH PROPORTION DATA####
+# Stripchart of observed ASVs of female flowers
+obs_hem_its <- ggplot(hembras_alfa_its, aes(x=especie, y=observed,
+                                            color=condicion)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Condition", 
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))+
+  scale_x_discrete(labels=c("2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+obs_hem_its
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_hembras_its.pdf", 
+       plot = obs_hem_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# Stripchart of observed ASVs of Male flowers
+obs_machos_its <- ggplot(machos_alfa_its, aes(x=especie, y=observed,
+                                              color=especie)) +
+  geom_boxplot()+
+  geom_jitter(position=position_jitter(0.2), size = 2)+
+  scale_shape_manual(values=c(1,19))+
+  labs(x="Species", y = "Richness")+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  scale_x_discrete(labels=c("1CF" = "CF", "2CPF" = "CPF","3CAS" = "CAS",
+                            "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"))+
+  #scale_shape_discrete(name = "Tratamientos", labels = c("No visitadas",
+  #                                                       "Visitadas")) +
+  #theme_bw()
+  theme_classic()
+#Exportamos grafico de alfa div (observed) a pdf
+ggsave("observed_machos_its.pdf", 
+       plot = obs_machos_its,
+       width = 25, 
+       height = 20, 
+       units = "cm")
+
+# combinando plots
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+obs_pro_its <- grid.arrange(obs_hem_its, obs_machos_its, 
+                        ncol = 2, nrow = 1)
+
+obs_pro_its <- ggarrange(obs_hem_its, obs_machos_its, ncol = 2, nrow = 1,
+                     labels = "AUTO")
+```
+
+### Análisis de diversidad Beta
+```{r}
+############################## BETA DIVERSITY #################################
+library(vegan)
+# phyloseq object filtered but no rarefied
+its6
+# divided by sex
+hembras_its
+machos_its
+
+#### Unweighted UniFrac HEMBRAS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+its_hem <- transform(hembras_its, "compositional")
+
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_its_hem = ordinate(its_hem, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_its_hem <- plot_ordination(its_hem, ordination_its_hem,
+                                    color="especie",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#stat_ellipse()
+
+baseplot_its_hem
+
+#baseplot_16s_hem +
+#  geom_point(size = 1)
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+
+#### Unweighted UniFrac MACHOS ####
+# Primero nos aseguramos que estamos usando las funciones del paquete correcto
+transform <- microbiome::transform
+# Proportion Normalization
+its_mac <- transform(machos_its, "compositional")
+
+# PCoA plot using the unweighted UniFrac as distance
+ordination_its_mac = ordinate(its_mac, method="PCoA", "unifrac",
+                              weighted = F)
+
+baseplot_its_mac <- plot_ordination(its_mac, ordination_its_mac,
+                                    color="especie",
+                                    type = "samples",
+) + #shape = "sexo"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 2)
+#stat_ellipse()
+baseplot_its_mac
+
+
+#### Weighted UniFrac HEMBRAS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_its_hem_wei = ordinate(its_hem,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_its_hem_wei <- plot_ordination(its_hem, 
+                                        ordination_its_hem_wei,
+                                        color="especie",
+                                        shape = "condicion",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Species", 
+                       labels = c("2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
+  scale_shape_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_its_hem_wei
+
+#baseplot_its_hem_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+
+#### Weighted UniFrac MACHOS####
+# PCoA plot using the weighted UniFrac as distance
+ordination_its_mac_wei = ordinate(its_mac,
+                                  method="PCoA", "wunifrac")
+# Plot
+baseplot_its_mac_wei <- plot_ordination(its_mac, 
+                                        ordination_its_mac_wei,
+                                        color="especie",
+                                        shape = "condicion",
+                                        type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Species", 
+                       labels = c("1CF" = "CF","2CPF" = "CPF","3CAS" = "CAS",
+                                  "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+                       palette = "Set1")+
+  scale_shape_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+baseplot_its_mac_wei
+
+#baseplot_its_mac_wei + stat_ellipse()
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+
+baseplot_16s_hem_wei
+baseplot_16s_mac_wei
+baseplot_its_hem_wei
+baseplot_its_mac_wei
+
+beta_analisis <- ggarrange(baseplot_16s_mac_wei, baseplot_16s_hem_wei,
+                           baseplot_its_mac_wei, baseplot_its_hem_wei,
+                           ncol = 2, nrow = 2, labels = "AUTO") 
+beta_analisis
+
+#### PERMANOVA by floral gender####
+## female flowers
+metadf_hem_its = data.frame(sample_data(hembras_its))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_its_hem <- UniFrac(its_hem, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_hem_its = adonis2(wunifrac.dist_its_hem ~ condicion / especie * tratamiento,
+                       data = metadf_hem_its,
+                   by = "terms", permutations = 999)
+perm_hem_its
+
+
+#Test dispersion among body sites
+disp_wun_its <- betadisper(wunifrac.dist_its_hem,
+                           sample_data(hembras_its)$tratamiento)
+permutest(disp_wun_its)
+
+
+
+## Male flowers
+metadf_mac_its = data.frame(sample_data(machos_its))
+
+# calculating Weighted-UniFrac
+wunifrac.dist_its_mac <- UniFrac(its_mac, 
+                             weighted = TRUE, 
+                             normalized = TRUE,  
+                             parallel = FALSE, 
+                             fast = TRUE)
+
+# Run PERMANOVA
+set.seed(100)   # Set the seed to make the analysis reproducible
+perm_mac_its = adonis2(wunifrac.dist_its_mac ~ condicion / especie * tratamiento,
+                       data = metadf_mac_its,
+                   by = "terms", permutations = 999)
+perm_mac_its
+
+
+#Test dispersion among body sites
+disp_wun_mac_its <- betadisper(wunifrac.dist_its_mac,
+                               sample_data(machos_its)$tratamiento)
+permutest(disp_wun_mac_its)
+
+disp_wun_mac_its2 <- betadisper(wunifrac.dist_its_mac,
+                                sample_data(machos_its)$especie)
+permutest(disp_wun_mac_its2)
+```

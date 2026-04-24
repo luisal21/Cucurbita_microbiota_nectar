@@ -83,11 +83,11 @@ s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
 s16_1
 
 # Building phylogenetic tree with the function rtree of package "ape"
-arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
+#arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
 #plot(arbol_16s)
 # Uniendo el arbol con el objeto phyloseq anterior
-s16_2 = merge_phyloseq(s16_1, arbol_16s)
-s16_2
+#s16_2 = merge_phyloseq(s16_1, arbol_16s)
+s16_2 = s16_1
 summarize_phyloseq(s16_2) #13,731,996 reads, 4160 ASVs in 356 samples
                           
 
@@ -105,7 +105,7 @@ ggplot(data=df, aes(x=Index, y=LibrarySize, color=sample_or_control)) + geom_poi
 # Identify Contaminants -Frequency
 contamdf.freq <- isContaminant(s16_2, method="frequency", conc="conce_mg")
 head(contamdf.freq)
-View(contamdf.freq)
+#View(contamdf.freq)
 table(contamdf.freq$contaminant)
 head(which(contamdf.freq$contaminant))
 
@@ -114,7 +114,7 @@ sample_data(s16_2)$is.neg <- sample_data(s16_2)$sample_or_control == "Control Sa
 contamdf.prev <- isContaminant(s16_2, method="prevalence", neg="is.neg")
 table(contamdf.prev$contaminant)
 head(which(contamdf.prev$contaminant), 20)
-View(contamdf.prev)
+#View(contamdf.prev)
 
 # Make phyloseq object of presence-absence in negative controls and true samples
 ps.pa <- transform_sample_counts(s16_2, function(abund) 1*(abund>0))
@@ -228,8 +228,1036 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
   geom_smooth(method="lm", se = FALSE) +
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
+
+#### CONTAR TAXONES POR NIVEL TAXONÓMICO #####
+# Extraer la tabla de taxonomía
+taxo <- as.data.frame(tax_table(s16_6))
+
+# Contar taxones únicos por nivel
+n_species <- length(unique(na.omit(taxo$Species)))
+n_genera  <- length(unique(na.omit(taxo$Genus)))
+n_families <- length(unique(na.omit(taxo$Family)))
+n_orders  <- length(unique(na.omit(taxo$Order)))
+n_classes <- length(unique(na.omit(taxo$Class)))
+n_phyla   <- length(unique(na.omit(taxo$Phylum)))
+
+# Ver todos juntos
+data.frame(
+  Nivel   = c("Phylum", "Class", "Order", "Family", "Genus", "Species"),
+  N_taxones = c(n_phyla, n_classes, n_orders, n_families, n_genera, n_species)
+)
+
 ###############################################################################
-#### ANALISIS DE COMPOSICIÓN TAXONÓMICA DE BACTERIAS SEPARADAS POR SEXO FLORAL 
+###############################################################################
+### ANÁLISIS DE NÚMEROS DE HILL
+
+#install.packages("iNEXT")       # rarefacción y extrapolación
+#install.packages("hillR")       # Hill a partir de phyloseq
+
+library(hillR)
+library(phyloseq)
+
+# Extraer tabla de OTU/ASV (muestras en filas)
+asv_table <- as.data.frame(t(otu_table(s16_6)))
+
+# Calcular Hill para cada q
+hill_q0 <- hill_taxa(asv_table, q = 0)  # riqueza
+hill_q1 <- hill_taxa(asv_table, q = 1)  # Shannon
+hill_q2 <- hill_taxa(asv_table, q = 2)  # Simpson
+
+# Unir con metadatos
+hill_df <- data.frame(
+  sample_id  = names(hill_q0),
+  q0         = hill_q0,
+  q1         = hill_q1,
+  q2         = hill_q2
+)
+
+# Agregar variables del experimento
+meta <- as.data.frame(sample_data(s16_6))
+hill_df <- merge(hill_df, meta, by = "row.names")
+View(hill_df)
+
+# Paso 2: Análisis estadístico con tus variables
+# Para cada orden de Hill
+mod_q0 <- glm(q0 ~ condicion * sexo * tratamiento, 
+              data = hill_df,
+              family = gaussian())
+
+mod_q1 <- glm(q1 ~ condicion * sexo * tratamiento, 
+              data = hill_df,
+              family = gaussian())
+
+mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
+              data = hill_df,
+              family = gaussian())
+
+# ANOVA tipo II
+library(car)
+Anova(mod_q0)
+Anova(mod_q1)
+Anova(mod_q2)
+
+
+###   CURVAS DE RAREFACCIÓN
+### POR CONDICIÓN
+library(iNEXT)
+
+# Extraer tabla de ASVs y metadatos del objeto phyloseq
+asv_table <- as.data.frame(otu_table(s16_6))# ASVs en filas, muestras en columnas
+metadata <- as.data.frame(as.matrix(sample_data(s16_6)))
+
+# Ver los niveles de condición
+unique(metadata$condicion)
+
+# Separar muestras por condición y sumar abundancias
+muestras_dom <- metadata %>% 
+  filter(condicion == "domesticada") %>% 
+  rownames()
+
+muestras_sil <- metadata %>% 
+  filter(condicion == "silvestre") %>% 
+  rownames()
+
+# Sumar todas las muestras de cada condición (un vector por condición)
+asv_domesticada <- rowSums(asv_table[, muestras_dom])
+asv_silvestre   <- rowSums(asv_table[, muestras_sil])
+
+# Crear lista para iNEXT (eliminar ASVs con abundancia 0)
+asv_por_condicion <- list(
+  domesticada = asv_domesticada[asv_domesticada > 0],
+  silvestre   = asv_silvestre[asv_silvestre > 0]
+)
+
+# Verificar
+str(asv_por_condicion)
+
+# Números de Hill por condición
+out_condicion <- iNEXT(asv_por_condicion,
+                       q        = c(0, 1, 2),
+                       datatype = "abundance",
+                       nboot    = 100,
+                       knots    = 40)
+out_condicion$DataInfo
+out_condicion$AsyEst
+
+write.csv(out_condicion$DataInfo, file = "Hill_condicion_datainfo.csv")
+write.csv(out_condicion$AsyEst, file = "Hill_condicion_asyest.csv")
+
+coverage_incidence_con <- estimateD(asv_por_condicion,
+                                q = c(0, 1, 2),
+                                datatype = "abundance",
+                                base = "coverage",
+                                conf = 0.95, nboot = 100)
+coverage_incidence_con
+
+# Gráfica de curvas de cobertura de muestra
+# Ver qué tan completo está cada muestra/grupo
+# ¿Mis muestras están bien secuenciadas? (cobertura)
+ggiNEXT(out_condicion, type = 2)+
+  scale_color_manual(name = "Condition",
+                     values = c("domesticada" = "#E6AB02", "silvestre" = "#4D9221"),
+                     labels = c("domesticada" = "Domesticated", "silvestre" = "Wild"))+
+  scale_fill_manual(name = "Condition",
+                    values = c("domesticada" = "#E6AB02", "silvestre" = "#4D9221"),
+                    labels = c("domesticada" = "Domesticated", "silvestre" = "Wild"))+
+  guides(
+    shape    = "none"   # ← quita la leyenda negra de formas
+    #linetype = "none"    # ← quita la leyenda de líneas si aparece duplicada
+  ) + 
+  theme_classic()+
+  #theme_bw()
+  labs(#title  = "Curvas de rarefacción por condición",
+    x      = "Number of sequences")
+#y      = "Diversidad (Hill)",
+#color  = "Condición",
+#fill   = "Condición")
+
+# Curvas de diversidad por cobertura
+# Comparar diversidad a igual completitud  
+# ¿Difieren los grupos a igual completitud? (comparación justa)  
+ggiNEXT(out_condicion, type = 3, facet.var = "Order.q")+
+  scale_color_manual(name = "Condition",
+                     values = c("domesticada" = "#E6AB02", "silvestre" = "#4D9221"),
+                     labels = c("domesticada" = "Domesticated", "silvestre" = "Wild"))+
+  scale_fill_manual(name = "Condition",
+                    values = c("domesticada" = "#E6AB02", "silvestre" = "#4D9221"),
+                    labels = c("domesticada" = "Domesticated", "silvestre" = "Wild"))+
+  guides(
+    shape    = "none"   # ← quita la leyenda negra de formas
+    #linetype = "none"    # ← quita la leyenda de líneas si aparece duplicada
+  )+
+  theme_classic()
+#facet_wrap(~Order.q, scales = "free_y",
+#           labeller = labeller(Order.q = c("0" = "q = 0  (Riqueza)",
+#                                          "1" = "q = 1  (Shannon)",
+#                                         "2" = "q = 2  (Simpson)")))
+
+### CURVAS DE RAREFACCIÓN POR SEXO
+# Separar muestras por sexo y sumar abundancias
+muestras_hem <- metadata %>% 
+  filter(sexo == "hembra") %>% 
+  rownames()
+
+muestras_mac <- metadata %>% 
+  filter(sexo == "macho") %>% 
+  rownames()
+
+# Sumar todas las muestras de cada sexo (un vector por sexo)
+asv_hem <- rowSums(asv_table[, muestras_hem])
+asv_mac   <- rowSums(asv_table[, muestras_mac])
+
+# Crear lista para iNEXT (eliminar ASVs con abundancia 0)
+asv_por_sexo <- list(
+  hembra = asv_hem[asv_hem > 0],
+  macho   = asv_mac[asv_mac > 0]
+)
+
+# Verificar
+str(asv_por_sexo)
+
+# Números de Hill por sexo
+out_sexo <- iNEXT(asv_por_sexo,
+                  q        = c(0, 1, 2),
+                  datatype = "abundance",
+                  nboot    = 100,
+                  knots    = 40)
+out_sexo$DataInfo
+out_sexo$AsyEst
+
+write.csv(out_sexo$DataInfo, file = "Hill_sexo_datainfo.csv")
+write.csv(out_sexo$AsyEst, file = "Hill_sexo_asyest.csv")
+
+
+coverage_incidence_sex <- estimateD(asv_por_sexo,
+                                q = c(0, 1, 2),
+                                datatype = "abundance",
+                                base = "coverage",
+                                conf = 0.95, nboot = 100)
+coverage_incidence_sex
+
+# Gráfica de curvas de cobertura de muestra
+# Ver qué tan completo está cada muestra/grupo
+# ¿Mis muestras están bien secuenciadas? (cobertura)
+ggiNEXT(out_sexo, type = 2) +
+  scale_color_manual(name = "Floral sex",
+                     values = c("hembra" = "#E6AB02", "macho" = "#4D9221"),
+                     labels = c("hembra" = "Pistillate", "macho" = "Staminate"))+
+  scale_fill_manual(name = "Floral sex",
+                    values = c("hembra" = "#E6AB02", "macho" = "#4D9221"),
+                    labels = c("hembra" = "Pistillate", "macho" = "Staminate"))+
+  guides(
+    shape    = "none"   # ← quita la leyenda negra de formas
+    #linetype = "none"    # ← quita la leyenda de líneas si aparece duplicada
+  ) + 
+  theme_classic()+
+  #theme_bw()
+  labs(#title  = "Curvas de rarefacción por condición",
+    x      = "Number of sequences")
+#y      = "Diversidad (Hill)",
+#color  = "Condición",
+#fill   = "Condición")
+
+# Curvas de diversidad por cobertura
+# Comparar diversidad a igual completitud  
+# ¿Difieren los grupos a igual completitud? (comparación justa)  
+ggiNEXT(out_sexo, type = 3, facet.var = "Order.q")+
+  scale_color_manual(name = "Floral sex",
+                     values = c("hembra" = "#E6AB02", "macho" = "#4D9221"),
+                     labels = c("hembra" = "Pistillate", "macho" = "Staminate"))+
+  scale_fill_manual(name = "Floral sex",
+                    values = c("hembra" = "#E6AB02", "macho" = "#4D9221"),
+                    labels = c("hembra" = "Pistillate", "macho" = "Staminate"))+
+  guides(
+    shape    = "none"   # ← quita la leyenda negra de formas
+    #linetype = "none"    # ← quita la leyenda de líneas si aparece duplicada
+  )+
+  theme_classic()
+#facet_wrap(~Order.q, scales = "free_y",
+#           labeller = labeller(Order.q = c("0" = "q = 0  (Riqueza)",
+#                                          "1" = "q = 1  (Shannon)",
+#                                         "2" = "q = 2  (Simpson)")))
+
+### CURVAS DE RAREFACCIÓN POR TRATAMIENTO
+# Separar muestras por tratamiento y sumar abundancias
+muestras_t1 <- metadata %>% 
+  filter(tratamiento == "t1") %>% 
+  rownames()
+
+muestras_t2 <- metadata %>% 
+  filter(tratamiento == "t2") %>% 
+  rownames()
+
+# Sumar todas las muestras de cada tratamiento (un vector por tratamiento)
+asv_t1 <- rowSums(asv_table[, muestras_t1])
+asv_t2   <- rowSums(asv_table[, muestras_t2])
+
+# Crear lista para iNEXT (eliminar ASVs con abundancia 0)
+asv_por_tra <- list(
+  t1 = asv_t1[asv_t1 > 0],
+  t2   = asv_t2[asv_t2 > 0]
+)
+
+# Verificar
+str(asv_por_tra)
+
+# Números de Hill por tratamiento
+out_trata <- iNEXT(asv_por_tra,
+                   q        = c(0, 1, 2),
+                   datatype = "abundance",
+                   nboot    = 100,
+                   knots    = 40)
+
+out_trata$DataInfo
+out_trata$AsyEst
+
+write.csv(out_trata$DataInfo, file = "Hill_tratamiento_datainfo.csv")
+write.csv(out_trata$AsyEst, file = "Hill_tratamiento_asyest.csv")
+
+
+coverage_incidence_tra <- estimateD(asv_por_tra,
+                                q = c(0, 1, 2),
+                                datatype = "abundance",
+                                base = "coverage",
+                                conf = 0.95, nboot = 100)
+coverage_incidence_tra
+
+# Gráfica de curvas de cobertura de muestra
+# Ver qué tan completo está cada muestra/grupo
+# ¿Mis muestras están bien secuenciadas? (cobertura)
+ggiNEXT(out_trata, type = 2) +
+  scale_color_manual(name = "Treatment",
+                     values = c("t1" = "#E6AB02", "t2" = "#4D9221"),
+                     labels = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_manual(name = "Floral sex",
+                    values = c("t1" = "#E6AB02", "t2" = "#4D9221"),
+                    labels = c("t1" = "Unvisited", "t2" = "Visited"))+
+  guides(
+    shape    = "none"   # ← quita la leyenda negra de formas
+    #linetype = "none"    # ← quita la leyenda de líneas si aparece duplicada
+  ) + 
+  theme_classic()+
+  #theme_bw()
+  labs(#title  = "Curvas de rarefacción por condición",
+    x      = "Number of sequences")
+#y      = "Diversidad (Hill)",
+#color  = "Condición",
+#fill   = "Condición")
+
+# Curvas de diversidad por cobertura
+# Comparar diversidad a igual completitud  
+# ¿Difieren los grupos a igual completitud? (comparación justa)  
+ggiNEXT(out_trata, type = 3, facet.var = "Order.q") +
+  scale_color_manual(name = "Treatment",
+                     values = c("t1" = "#E6AB02", "t2" = "#4D9221"),
+                     labels = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_manual(name = "Floral sex",
+                    values = c("t1" = "#E6AB02", "t2" = "#4D9221"),
+                    labels = c("t1" = "Unvisited", "t2" = "Visited"))+
+  guides(
+    shape    = "none"   # ← quita la leyenda negra de formas
+    #linetype = "none"    # ← quita la leyenda de líneas si aparece duplicada
+  )+
+  theme_classic()
+#facet_wrap(~Order.q, scales = "free_y",
+#           labeller = labeller(Order.q = c("0" = "q = 0  (Riqueza)",
+#                                          "1" = "q = 1  (Shannon)",
+#                                         "2" = "q = 2  (Simpson)")))
+
+#### CURVAS DE RAREFACCIÓN POR GRUPOS
+# Separar muestras por condición × sexo × tratamiento
+muestras_dom_hem_t1 <- metadata %>% filter(condicion == "domesticada", sexo == "hembra", tratamiento == "t1") %>% rownames()
+muestras_dom_hem_t2 <- metadata %>% filter(condicion == "domesticada", sexo == "hembra", tratamiento == "t2") %>% rownames()
+muestras_dom_mac_t1 <- metadata %>% filter(condicion == "domesticada", sexo == "macho",  tratamiento == "t1") %>% rownames()
+muestras_dom_mac_t2 <- metadata %>% filter(condicion == "domesticada", sexo == "macho",  tratamiento == "t2") %>% rownames()
+muestras_sil_hem_t1 <- metadata %>% filter(condicion == "silvestre",   sexo == "hembra", tratamiento == "t1") %>% rownames()
+muestras_sil_hem_t2 <- metadata %>% filter(condicion == "silvestre",   sexo == "hembra", tratamiento == "t2") %>% rownames()
+muestras_sil_mac_t1 <- metadata %>% filter(condicion == "silvestre",   sexo == "macho",  tratamiento == "t1") %>% rownames()
+muestras_sil_mac_t2 <- metadata %>% filter(condicion == "silvestre",   sexo == "macho",  tratamiento == "t2") %>% rownames()
+
+
+muestras_t1_dom_hem <- metadata %>% filter(tratamiento == "t1", condicion == "domesticada", sexo == "hembra") %>% rownames()
+muestras_t2_dom_hem <- metadata %>% filter(tratamiento == "t2", condicion == "domesticada", sexo == "hembra") %>% rownames()
+muestras_t1_dom_mac <- metadata %>% filter(tratamiento == "t1", condicion == "domesticada", sexo == "macho") %>% rownames()
+muestras_t2_dom_mac <- metadata %>% filter(tratamiento == "t2", condicion == "domesticada", sexo == "macho") %>% rownames()
+muestras_t1_sil_hem <- metadata %>% filter(tratamiento == "t1", condicion == "silvestre",   sexo == "hembra") %>% rownames()
+muestras_t2_sil_hem <- metadata %>% filter(tratamiento == "t2", condicion == "silvestre",   sexo == "hembra") %>% rownames()
+muestras_t1_sil_mac <- metadata %>% filter(tratamiento == "t1", condicion == "silvestre",   sexo == "macho") %>% rownames()
+muestras_t2_sil_mac <- metadata %>% filter(tratamiento == "t2", condicion == "silvestre",   sexo == "macho") %>% rownames()
+
+# Verificar cuántas muestras hay en cada grupo
+cat("t1-dom-hembra:", length(muestras_t1_dom_hem), "\n")
+cat("t2-dom-hembra:", length(muestras_t2_dom_hem), "\n")
+cat("t1-dom-macho: ", length(muestras_t1_dom_mac), "\n")
+cat("t2-dom-macho: ", length(muestras_t2_dom_mac), "\n")
+cat("t1-sil-hembra:", length(muestras_t1_sil_hem), "\n")
+cat("t2-sil-hembra:", length(muestras_t2_sil_hem), "\n")
+cat("t1-sil-macho: ", length(muestras_t1_sil_mac), "\n")
+cat("t2-sil-macho: ", length(muestras_t2_sil_mac), "\n")
+
+# Sumar abundancias por grupo
+asv_t1_dom_hem <- rowSums(asv_table[, muestras_t1_dom_hem])
+asv_t2_dom_hem <- rowSums(asv_table[, muestras_t2_dom_hem])
+asv_t1_dom_mac <- rowSums(asv_table[, muestras_t1_dom_mac])
+asv_t2_dom_mac <- rowSums(asv_table[, muestras_t2_dom_mac])
+asv_t1_sil_hem <- rowSums(asv_table[, muestras_t1_sil_hem])
+asv_t2_sil_hem <- rowSums(asv_table[, muestras_t2_sil_hem])
+asv_t1_sil_mac <- rowSums(asv_table[, muestras_t1_sil_mac])
+asv_t2_sil_mac <- rowSums(asv_table[, muestras_t2_sil_mac])
+
+# Crear lista para iNEXT (eliminar ASVs con abundancia 0)
+asv_por_grupo <- list(
+  "UDP" = asv_t1_dom_hem[asv_t1_dom_hem > 0],
+  "VDP" = asv_t2_dom_hem[asv_t2_dom_hem > 0],
+  "UDS" = asv_t1_dom_mac[asv_t1_dom_mac > 0],
+  "VDS" = asv_t2_dom_mac[asv_t2_dom_mac > 0],
+  "UWP" = asv_t1_sil_hem[asv_t1_sil_hem > 0],
+  "VWP" = asv_t2_sil_hem[asv_t2_sil_hem > 0],
+  "UWS" = asv_t1_sil_mac[asv_t1_sil_mac > 0],
+  "VWS" = asv_t2_sil_mac[asv_t2_sil_mac > 0]
+)
+
+# Correr iNEXT
+out_grupos <- iNEXT(asv_por_grupo,
+                    q        = c(0, 1, 2),
+                    datatype = "abundance",
+                    nboot    = 100,
+                    knots    = 40)
+out_grupos$DataInfo
+out_grupos$AsyEst
+
+#write.csv(out_grupos$DataInfo, file = "Hill_grupos_datainfo.csv")
+#write.csv(out_grupos$AsyEst, file = "Hill_grupos_asyest.csv")
+
+
+coverage_incidence_grupo <- estimateD(asv_por_grupo,
+                                      q = c(0, 1, 2),
+                                      datatype = "abundance",
+                                      base = "coverage",
+                                      conf = 0.95, nboot = 100)
+coverage_incidence_grupo
+write.csv(coverage_incidence_grupo, file = "Hill_numbers.csv")
+
+
+colores_8 <- c(
+  "UDP" = "#E74C3C",
+  "VDP" = "#E74C3C",
+  "UDS"  = "#E67E22",
+  "VDS"  = "#E67E22",
+  "UWP" = "#2980B9",
+  "VWP" = "#2980B9",
+  "UWS"  = "#27AE60",
+  "VWS"  = "#27AE60"
+)
+
+# Gráfica tipo 1
+p <- ggiNEXT(out_grupos, type = 1, facet.var = "Order.q")
+
+# Modificar el grosor de las líneas en los layers
+p$layers[[1]]$aes_params$linewidth <- 0.5  # líneas
+p$layers[[2]]$aes_params$linewidth <- 0.5  # líneas extrapoladas
+
+p +
+  scale_color_manual(values = colores_8) +
+  scale_fill_manual(values  = colores_8) +
+  scale_shape_manual(values = c(
+    "UDP" = 16,   # círculo relleno
+    "VDP" = 21,   # círculo con borde
+    "UDS"  = 17,   # triángulo relleno
+    "VDS"  = 24,   # triángulo con borde
+    "UWP" = 15,   # cuadrado relleno
+    "VWP" = 22,   # cuadrado con borde
+    "UWS"  = 18,   # diamante relleno
+    "VWS"  = 23))+ # diamante con borde
+  #guides(shape = "none", linetype = "none") +
+  theme_classic() +
+  labs(#title = "Números de Hill por condición × sexo × tratamiento",
+    x     = "Number of sequences")
+#y     = "Diversidad (Hill)",
+#color = "Grupo")
+
+# Gráfica tipo 2
+p2 = ggiNEXT(out_grupos, type = 2) 
+
+# Modificar el grosor de las líneas en los layers
+p2$layers[[1]]$aes_params$linewidth <- 0.5  # líneas
+p2$layers[[2]]$aes_params$linewidth <- 0.5  # líneas extrapoladas
+
+p2 +
+  scale_color_manual(values = colores_8) +
+  scale_fill_manual(values  = colores_8) +
+  scale_shape_manual(values = c(
+    "UDP" = 16,   # círculo relleno
+    "VDP" = 21,   # círculo con borde
+    "UDS"  = 17,   # triángulo relleno
+    "VDS"  = 24,   # triángulo con borde
+    "UWP" = 15,   # cuadrado relleno
+    "VWP" = 22,   # cuadrado con borde
+    "UWS"  = 18,   # diamante relleno
+    "VWS"  = 23)) + # diamante con borde
+  theme_classic() 
+
+
+# Gráfica tipo 3
+p3 = ggiNEXT(out_grupos, type = 3, facet.var = "Order.q")
+
+# Modificar el grosor de las líneas en los layers
+p3$layers[[1]]$aes_params$linewidth <- 0.5  # líneas
+p3$layers[[2]]$aes_params$linewidth <- 0.5  # líneas extrapoladas
+
+p3 +
+  scale_color_manual(values = colores_8) +
+  scale_fill_manual(values  = colores_8) +
+  scale_shape_manual(values = c(
+    "UDP" = 16,   # círculo relleno
+    "VDP" = 21,   # círculo con borde
+    "UDS"  = 17,   # triángulo relleno
+    "VDS"  = 24,   # triángulo con borde
+    "UWP" = 15,   # cuadrado relleno
+    "VWP" = 22,   # cuadrado con borde
+    "UWS"  = 18,   # diamante relleno
+    "VWS"  = 23))+ # diamante con borde
+  theme_classic() 
+
+
+### Extraer valores y graficar con intervalos de confianza
+
+# Extraer valores en el punto observado (tamaño real de muestra)
+hill_valores <- coverage_incidence_grupo %>% # solo el punto observado
+  select(Assemblage, Order.q, qD, qD.LCL, qD.UCL) %>%
+  mutate(Order.q = case_when(
+    Order.q == 0 ~ "q = 0 (Riqueza)",
+    Order.q == 1 ~ "q = 1 (Shannon)",
+    Order.q == 2 ~ "q = 2 (Simpson)"
+  ))
+
+
+# Verificar
+head(hill_valores)
+
+# Paso 2: Separar las variables del nombre del grupo
+hill_valores <- hill_valores %>%
+  mutate(
+    tratamiento = substr(Assemblage, 1, 1),  # U = unvisited, V = visited
+    condicion   = substr(Assemblage, 2, 2),  # D = domesticated, W = wild
+    sexo        = substr(Assemblage, 3, 3)   # P = pistillate, S = staminate
+  )
+
+head(hill_valores)
+
+# Reordenar los niveles para que aparezcan en orden lógico en el eje X
+#hill_valores$Assemblage <- factor(hill_valores$Assemblage, 
+ #                                 levels = c("t1-Dom-Hembra", "t2-Dom-Hembra:",
+  #                                           "t1-Dom-Macho", "t2-Dom-Macho",
+    #                                         "t1-Sil-Hembra", "t2-Sil-Hembra",
+      #                                         "t1-Sil-Macho", "t2-Sil-Macho"))
+
+ggplot(hill_valores, aes(x = Assemblage, y = qD)) +
+  # Intervalo de confianza
+  geom_errorbar(aes(ymin = qD.LCL, ymax = qD.UCL),
+                width     = 0.2,
+                linewidth = 0.3) +
+  # Puntos
+  geom_point(size = 2.5, shape = 21,
+             fill = "grey70", color = "black") +
+  facet_wrap(~Order.q, scales = "free_y",
+             labeller = labeller(Order.q = c(
+               "q = 0 (Riqueza)"  = "Richness",
+               "q = 1 (Shannon)"  = "Hill-Shannon",
+               "q = 2 (Simpson)"  = "Hill-Simpson"))) +
+  theme_bw(base_size = 13) +
+  theme(axis.text.x    = element_text(angle = 45, hjust = 1, face = "italic"),
+        strip.background = element_rect(fill = "grey90"),
+        strip.text       = element_text(face = "bold"),
+        legend.position  = "none") +
+  labs(x = NULL,
+       y = "Diversity (Hill)")
+
+
+  scale_x_discrete(labels= c("Dom-Hembra-t1" = "DPU",
+                             "Dom-Hembra-t2" = "DPV",
+                             "Dom-Macho-t1" = "DSU",
+                             "Dom-Macho-t2" = "DSV",
+                             "Sil-Hembra-t1" = "WPU",
+                             "Sil-Hembra-t2" = "WPV",
+                             "Sil-Macho-t1" = "WSU",
+                             "Sil-Macho-t2" = "WSV"))
+
+###############################################################################
+################
+BiocManager::install("DECIPHER")
+
+# Cargando paquetes
+library(DECIPHER)
+library(phangorn)
+library(Biostrings)
+
+
+ntaxa(s16_6)
+
+# 1. extraer directo de los rownames
+seqs <- rownames(otu_table(s16_6))
+
+# 2. Verificar que son secuencias y no IDs
+head(seqs)  # deben verse como "ATCGGCTA..." 
+nchar(seqs[1])  # debe tener longitud de ~250 pb para ITS2
+
+# 3. Convertir a DNAStringSet y nombrar
+seqs_dna <- DNAStringSet(seqs)
+names(seqs_dna) <- seqs
+
+# 4. Verificar
+class(seqs_dna)
+length(seqs_dna)  # debe coincidir con número de ASVs
+
+# 5. Ahora sí correr el alineamiento
+alineamiento <- AlignSeqs(seqs_dna)
+
+# 6. Guardar el alineamiento en formato FASTA
+writeXStringSet(alineamiento, 
+                filepath = "alineamiento_its2.fasta")
+
+# 7. Verificar que se guardó
+file.exists("alineamiento_its2.fasta")
+
+library(ape)
+
+##### Importar árbol ####
+arbol_ft <- read.tree("arbol_its2.nwk")
+
+# Verificar
+arbol_ft
+plot(arbol_ft, cex = 0.2)  # grafica rápida para verificar
+
+# Incorporar a phyloseq
+ps_con_arbol <- merge_phyloseq(s16_6, phy_tree(arbol_ft))
+
+# Verificar que quedó bien
+ps_con_arbol
+phy_tree(ps_con_arbol)
+
+# UniFrac no ponderado
+unifrac_nw <- UniFrac(ps_con_arbol, weighted = FALSE, normalized = TRUE)
+
+# UniFrac ponderado
+unifrac_w  <- UniFrac(ps_con_arbol, weighted = TRUE, normalized = TRUE)
+
+# PERMANOVA y gráficas para UniFrac
+library(vegan)
+
+metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
+
+# UniFrac no ponderado
+set.seed(1)
+adonis2(unifrac_nw ~ condicion * sexo * tratamiento,
+        data         = metadata,
+        permutations = 999, by = "terms")
+
+# UniFrac ponderado
+set.seed(1)
+adonis2(unifrac_w ~ condicion * sexo * tratamiento,
+        data         = metadata,
+        permutations = 999, by = "terms")
+
+### Verificar homogeneidad de dispersión
+# UniFrac no ponderado
+disp_nw1 <- betadisper(unifrac_nw, metadata$sexo)
+permutest(disp_nw1, permutations = 999)
+
+disp_nw2 <- betadisper(unifrac_nw, metadata$tratamiento)
+permutest(disp_nw2, permutations = 999)
+
+# UniFrac ponderado
+disp_w1 <- betadisper(unifrac_w, metadata$sexo)
+permutest(disp_w1, permutations = 999)
+
+disp_w2 <- betadisper(unifrac_w, metadata$tratamiento)
+permutest(disp_w2, permutations = 999)
+
+
+### Gráficas PCoA
+#### Weighted UniFrac GLOBAL####
+# PCoA plot using the weighted UniFrac as distance
+ordination_16s_wei = ordinate(ps_con_arbol,
+                              method="PCoA", "wunifrac")
+# Plot
+baseplot_16s_wei <- plot_ordination(ps_con_arbol, 
+                                    ordination_16s_wei,
+                                    color="tratamiento",
+                                    #shape = "sexo",
+                                    type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Treatment",
+                       labels = c("t1" = "Unvisited",
+                                  "t2" = "Visited"),
+                       palette = c("#E6AB02","#4D9221"))
+#scale_color_discrete(name = "Species", 
+#                    labels = c("2CPF" = "CPF","3CAS" = "CAS",
+#                              "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+#        palette = "Set1")+
+#scale_shape_discrete(name = "Condition",
+#                    labels = c("domesticada" = "Domesticated",
+#                              "silvestre" = "Wild"))
+#scale_shape_manual(values=c(16,3))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+#baseplot_16s_wei
+#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
+baseplot_16s_wei + stat_ellipse(linetype = 2)
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
+#wei_16s
+#+ coord_fixed()
+
+#+ stat_ellipse(type = "t")
+#baseplot_16s_hem_wei + stat_ellipse(type = "t")
+
+
+
+
+graficar_pcoa_unifrac <- function(dist_matrix, titulo) {
+  
+  pcoa <- cmdscale(dist_matrix, eig = TRUE, k = 2)
+  
+  df_pcoa <- data.frame(
+    PC1         = pcoa$points[, 1],
+    PC2         = pcoa$points[, 2],
+    condicion   = metadata$condicion,
+    sexo        = metadata$sexo,
+    tratamiento = metadata$tratamiento
+  )
+  
+  var_exp <- round(pcoa$eig / sum(pcoa$eig[pcoa$eig > 0]) * 100, 1)
+  
+  ggplot(df_pcoa, aes(x = PC1, y = PC2,
+                      color = condicion,
+                      shape = tratamiento)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = condicion,
+                     color = condicion),
+                 linewidth = 0.7) +
+    scale_color_manual(values = c("domesticada" = "#C0392B",
+                                  "silvestre"   = "#2980B9")) +
+    scale_shape_manual(values = c("t1" = 16,
+                                  "t2" = 17)) +
+    theme_bw(base_size = 13) +
+    theme(legend.position  = "right",
+          strip.background = element_rect(fill = "grey90")) +
+    labs(title = titulo,
+         x     = paste0("PC1 (", var_exp[1], "%)"),
+         y     = paste0("PC2 (", var_exp[2], "%)"),
+         color = "Condición",
+         shape = "Tratamiento")
+}
+
+# Generar las gráficas
+p_nw <- graficar_pcoa_unifrac(unifrac_nw, "PCoA - UniFrac no ponderado")
+p_w  <- graficar_pcoa_unifrac(unifrac_w,  "PCoA - UniFrac ponderado")
+
+# Ver por separado
+p_nw
+p_w
+
+# O juntas con patchwork
+library(patchwork)
+p_nw + p_w
+
+######################### Bray-Curtis y Sørensen en R #########################
+library(vegan)
+
+# Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
+asv_matrix <- t(as.data.frame(otu_table(ps_con_arbol)))
+
+# Bray-Curtis (basada en abundancias)
+dist_bray <- vegdist(asv_matrix, method = "bray")
+
+# Sørensen (basada en presencia/ausencia)
+dist_sorensen <- vegdist(asv_matrix, method = "bray", binary = TRUE)
+# binary = TRUE convierte a presencia/ausencia antes de calcular
+
+# PERMANOVA para probar diferencias entre grupos
+metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
+
+# Con Bray-Curtis
+set.seed(1)
+adonis2(dist_bray ~ condicion * sexo * tratamiento,
+        data         = metadata,
+        permutations = 999, by = "terms")
+
+# Con Sørensen
+set.seed(1)
+adonis2(dist_sorensen ~ condicion * sexo * tratamiento,
+        data         = metadata,
+        permutations = 999, by = "terms")
+
+
+# Bray-Curtis BETADISPER
+disp_bray1 <- betadisper(dist_bray, metadata$condicion)
+permutest(disp_bray1, permutations = 999)
+
+disp_bray3 <- betadisper(dist_bray, metadata$tratamiento)
+permutest(disp_bray3, permutations = 999)
+
+# Sørensen
+disp_sor1 <- betadisper(dist_sorensen, metadata$condicion)
+permutest(disp_sor1, permutations = 999)
+
+disp_sor3 <- betadisper(dist_sorensen, metadata$tratamiento)
+permutest(disp_sor3, permutations = 999)
+
+
+# Función para graficar PCoA
+graficar_pcoa <- function(dist_matrix, titulo){
+  
+  pcoa <- cmdscale(dist_matrix, eig = TRUE, k = 2)
+  
+  df_pcoa <- data.frame(
+    PC1       = pcoa$points[, 1],
+    PC2       = pcoa$points[, 2],
+    condicion  = metadata$condicion,
+    sexo       = metadata$sexo,
+    tratamiento = metadata$tratamiento
+  )
+  
+  # Varianza explicada
+  var_exp <- round(pcoa$eig / sum(pcoa$eig[pcoa$eig > 0]) * 100, 1)
+  
+  ggplot(df_pcoa, aes(x = PC1, y = PC2,
+                      color = condicion,
+                      shape = tratamiento)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = tratamiento,
+                     color = tratamiento),
+                 linewidth = 0.7) +
+    theme_bw(base_size = 13) +
+    labs(title = titulo,
+         x = paste0("PC1 (", var_exp[1], "%)"),
+         y = paste0("PC2 (", var_exp[2], "%)"),
+         color = "Condición",
+         shape = "Tratamiento")
+}
+
+# Graficar ambas
+graficar_pcoa(dist_bray,     "PCoA - Bray-Curtis")
+graficar_pcoa(dist_sorensen, "PCoA - Sørensen")
+
+#
+p_bc  <- graficar_pcoa(dist_bray,      "Bray-Curtis")
+p_sor <- graficar_pcoa(dist_sorensen,  "Sørensen")
+p_nw  <- graficar_pcoa_unifrac(unifrac_nw, "UniFrac no ponderado")
+p_w   <- graficar_pcoa_unifrac(unifrac_w,  "UniFrac ponderado")
+
+(p_bc + p_sor) / (p_nw + p_w) +
+  plot_annotation(title = "Diversidad beta - Microbiota de néctar",
+                  theme = theme(plot.title = element_text(face = "bold",
+                                                          size = 14)))
+
+
+# Beta total = Recambio (turnover) + Anidamiento (nestedness)
+
+#Recambio   → comunidades con especies completamente diferentes
+#Anidamiento → una comunidad es subconjunto de otra
+
+# En R con el paquete betapart
+install.packages('rcdd')
+install.packages("betapart")
+
+library(betapart)
+
+
+# Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
+comunidades <- t(as.data.frame(otu_table(ps)))
+
+# Verificar dimensiones
+dim(asv_matrix)  # debe ser: número de muestras × número de ASVs
+head(rownames(asv_matrix))  # nombres de muestras
+head(colnames(asv_matrix))  # nombres de ASVs
+
+# Convertir a presencia/ausencia (0 y 1)
+comunidades <- ifelse(asv_matrix > 0, 1, 0)
+
+beta_total <- beta.pair(comunidades, index.family = "jaccard")
+beta_total$beta.jtu   # recambio (turnover)
+beta_total$beta.jne   # anidamiento (nestedness)
+beta_total$beta.jac   # beta total
+
+
+# Con abundancias usar bray en lugar de jaccard
+beta_bray <- beta.pair.abund(asv_matrix, index.family = "bray")
+
+beta_bray$beta.bray.bal   # recambio (balancedness)
+beta_bray$beta.bray.gra   # anidamiento (gradient)
+beta_bray$beta.bray       # beta total
+
+boxplot(beta_bray$beta.bray.bal)
+boxplot(beta_bray$beta.bray.gra)
+boxplot(beta_bray$beta.bray)
+
+### Gráficar
+# Correr betapart (presencia/ausencia)
+beta_total <- beta.pair(comunidades, index.family = "jaccard")
+
+# Convertir cada matriz de distancia a data.frame
+turnover   <- as.matrix(beta_total$beta.jtu)
+nestedness <- as.matrix(beta_total$beta.jne)
+beta_jac   <- as.matrix(beta_total$beta.jac)
+
+# Convertir a formato largo
+mat_to_long <- function(mat, nombre) {
+  as.data.frame(mat) %>%
+    mutate(sample1 = rownames(.)) %>%
+    pivot_longer(-sample1, names_to = "sample2", values_to = nombre) %>%
+    filter(sample1 != sample2)  # quitar diagonal
+}
+
+df_turn <- mat_to_long(turnover,   "turnover")
+df_nest <- mat_to_long(nestedness, "nestedness")
+df_jac  <- mat_to_long(beta_jac,   "beta_total")
+
+# Unir los tres componentes
+df_beta <- df_turn %>%
+  left_join(df_nest, by = c("sample1", "sample2")) %>%
+  left_join(df_jac,  by = c("sample1", "sample2"))
+
+head(df_beta)
+
+# Agregar metadatos
+metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
+
+# Agregar metadatos de sample1
+df_beta <- df_beta %>%
+  left_join(metadata %>% 
+              mutate(sample1 = rownames(.)) %>%
+              select(sample1, 
+                     condicion1   = condicion,
+                     sexo1        = sexo,
+                     tratamiento1 = tratamiento),
+            by = "sample1") %>%
+  # Agregar metadatos de sample2
+  left_join(metadata %>%
+              mutate(sample2 = rownames(.)) %>%
+              select(sample2,
+                     condicion2   = condicion,
+                     sexo2        = sexo,
+                     tratamiento2 = tratamiento),
+            by = "sample2") %>%
+  # Crear columna de comparación entre grupos
+  mutate(
+    comp_condicion   = paste(pmin(condicion1,   condicion2),
+                             pmax(condicion1,   condicion2),   sep = " vs "),
+    comp_sexo        = paste(pmin(sexo1,        sexo2),
+                             pmax(sexo1,        sexo2),        sep = " vs "),
+    comp_tratamiento = paste(pmin(tratamiento1, tratamiento2),
+                             pmax(tratamiento1, tratamiento2), sep = " vs ")
+  )
+
+# Convertir a formato largo para graficar turnover y nestedness juntos
+df_long <- df_beta %>%
+  pivot_longer(cols      = c(turnover, nestedness),
+               names_to  = "componente",
+               values_to = "valor") %>%
+  mutate(componente = factor(componente,
+                             levels = c("turnover", "nestedness"),
+                             labels = c("Recambio (turnover)",
+                                        "Anidamiento (nestedness)")))
+
+View(df_long)
+###
+# Crear grupo combinado de comparación
+df_long <- df_long %>%
+  mutate(grupo = paste0(comp_condicion, "\n",
+                        comp_sexo, "\n",
+                        comp_tratamiento))
+
+ggplot(df_long, aes(x = comp_condicion, y = valor,
+                    fill = comp_tratamiento)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.5,
+               position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = c("t1 vs t1" = "#E74C3C",
+                               "t1 vs t2" = "#E67E22",
+                               "t2 vs t2" = "#27AE60")) +
+  facet_grid(componente ~ comp_sexo, scales = "free_y") +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x     = element_text(angle = 45, hjust = 1),
+        strip.background = element_rect(fill = "grey90"),
+        strip.text       = element_text(face = "bold"),
+        legend.position  = "bottom") +
+  labs(title = "Recambio y anidamiento por condición × sexo × tratamiento",
+       x     = "Condición",
+       y     = "Distancia de Jaccard",
+       fill  = "Comparación de tratamiento")
+
+###############################################################################
+###############################################################################
+#### EXTRAYENDO LAS MUESTRAS DE FLORES VISITADAS
+visitadas <- subset_samples(ps_con_arbol, tratamiento == "t2")
+visitadas
+
+#### Obteniendo las abundancias relativas por especie
+# 1. Preparación del objeto Phyloseq
+# A. Aglomerar a nivel de Familia. Esto suma los reads de todos los ASVs/OTUs
+# que pertenecen a la misma familia. Reduce la complejidad drásticamente.
+ps_fam <- tax_glom(visitadas, taxrank = "Family", NArm = FALSE)
+
+# B. Transformar a abundancia relativa (escala 0-1)
+# Esto estandariza las muestras independientemente de su profundidad de secuenciación.
+ps_rel <- transform_sample_counts(ps_fam, function(x) x / sum(x))
+
+# C. Convertir el objeto phyloseq a un dataframe largo ('melted' dataframe)
+df_melt <- psmelt(ps_rel)
+
+# D. Agrupar por Especie y Familia, y calcular la abundancia relativa PROMEDIO
+# para esa especie de planta.
+df_grouped <- df_melt %>%
+  dplyr::group_by(condicion, sexo, Family) %>% 
+  dplyr::summarize(MeanRelAbund = mean(Abundance), .groups = "drop")
+
+# E. Identificar el Top 10 de familias más abundantes POR ESPECIE.
+# Usamos slice_max para quedarnos con las 10 filas con mayor abundancia promedio por grupo.
+top10_per_species <- df_grouped %>%
+  group_by(condicion, sexo) %>%
+  slice_max(order_by = MeanRelAbund, n = 10, with_ties = FALSE) %>%
+  mutate(Classification = Family) %>% # Guardamos el nombre para el cruce
+  ungroup()
+
+# F. Crear la categoría "Otras".
+# Cruzamos la tabla agrupada completa con la tabla del Top 10.
+df_final <- df_grouped %>%
+  left_join(select(top10_per_species, condicion, sexo, Family, Classification), 
+            by = c("condicion","sexo", "Family")) %>%
+  # Si la familia NO estaba en el top10 (Classification es NA), la llamamos "Otras"
+  dplyr::mutate(Taxonomy_Display = ifelse(is.na(Classification), 
+                                          "Other", 
+                                          as.character(Family))) %>%
+  # Volvemos a agrupar y sumar para colapsar todas las "Otras" en una sola fila por especie
+  dplyr::group_by(condicion, sexo, Taxonomy_Display) %>%
+  dplyr::summarize(TotalMeanAbund = sum(MeanRelAbund), .groups = 'drop') %>%
+  # Convertir abundancia relativa (0-1) a porcentaje (0-100) para el gráfico
+  dplyr::mutate(Percentage = TotalMeanAbund * 100)
+View(df_final)
+write.csv(df_final, file = "abundancias_visitadas_abril.csv")
+
+
+
+
+
+
+
+
+
+
+
 
 # Separando por sexos florales
 hembras_pro <- subset_samples(s16_6, sexo == "hembra")
@@ -2938,5 +3966,494 @@ install.packages("tinytex")
 tinytex::install_tinytex()
 tinytex::install_tinytex()
 
+
+
+###############################################################################
+###############################################################################
+#### Redes de interacción DE POLINIZADORES EN PARCELA DE MORELIA ####
+## Estableciendo directorio en el cual se encuentran las bases de datos ##
+setwd("/home/luis/Documentos/3_Doctorado_UNAM/a-proyecto/analisis_florales_tesis_2022")
+more2021 <- read.csv("visitas_morelia_2021.csv", header = T)
+head(more2021)
+str(more2021)
+
+
+
+### Horas totales de grabación entre 2021 y 2022: 128:52:28
+# Horas de grabación por especie
+# CPF: 7:31:30
+# CPP: 30:41:42
+# CAS: 31:25:02
+# CAA: 22:50:56
+# CM: 13:18:00
+
+#To calculate the visitation rate for each floral visitor group we divided the
+# number of visits by the total duration of the video recording 
+# (decimal time = time x 1440) for each flower.
+
+
+# numero de visitas por especie
+tapply(more2021$especie, more2021$condicion, length)
+tapply(more2021$especie, more2021$Especie.planta, length)
+
+#
+visitas <- more2021 %>%
+  dplyr::group_by(condicion, sexo, especie) %>%
+  dplyr::summarize(num_visitas = length(especie))
+
+## frecuencia de visitas
+frec <- more2021 %>%
+  dplyr::group_by(año, fecha, condicion, ID.planta, sexo, especie,
+                  duración.decimal) %>%
+  dplyr::summarize(num_visitas = length(especie)) %>% 
+  dplyr::mutate(frecu = num_visitas/duración.decimal)
+
+frec2 <- frec %>%
+  dplyr::group_by(condicion, sexo, especie) %>%
+  dplyr::summarize(mean_frec = mean(frecu))
+
+
+View(frec2)
+#
+ggplot(frec, aes(condicion, fill = especie))+
+  geom_bar()
+#
+ggplot(more2021, aes(condicion, fill = especie))+
+  geom_bar(position = "fill")
+#
+ggplot(more2021, aes(condicion, fill = especie))+
+  geom_bar()+
+  facet_grid(.~ sexo)
+#
+ggplot(more2021, aes(condicion, fill = especie))+
+  geom_bar(position = "fill")+
+  facet_grid(.~ sexo)
+
+### Realizando redes de interacción ###
+library(fossil)
+
+visitas2 = visitas %>%
+  unite("plant_sex", condicion:sexo)
+df_vis <- create.matrix(as.data.frame(visitas2), tax.name = "especie",
+                        locality = "plant_sex",
+                        abund.col = "num_visitas",
+                        abund = TRUE)
+df1_vis <- t(df_vis)
+
+# frecuencias de visita
+frec3 = frec2 %>%
+  unite("plant_sex", condicion:sexo)
+#write.csv(frec3, file = "frecuencias_visitas.csv")
+
+df <- create.matrix(as.data.frame(frec3), tax.name = "especie",
+                    locality = "plant_sex",
+                    abund.col = "mean_frec",
+                    abund = TRUE)
+df1 <- t(df)
+
+#cargar la libreria bipartite
+library (bipartite)
+
+#Dibujar la red de interacciones
+# numero de visita
+plotweb(df1_vis)
+plotweb(df1_vis,method="normal", y.lim=c(-1,2.5), labsize=1.2, text.rot=90,
+        col.high = "brown4", col.low = "#D9A404")
+
+# frecuencia de visita
+plotweb(df1,method="normal", y.lim=c(-1,2.5), labsize=1.2, text.rot=90,
+        col.high = "brown4", col.low = "#D9A404")
+plotweb(df1, sorting = "normal", higher_color = "#E6AB02",
+        lower_color = "#4D9221")
+
+
+specieslevel(df1)
+beeR<-specieslevel(df1)
+summary(beeR)
+str(beeR)
+class(beeR)
+
+colors()
+
+#Calcular la m?tricas de red y guardarlos en un archivo de texto
+bee_strength<-beeR$'higher level'
+write.table(bee_strength, "bee_strength")
+
+plant_strength<-beeR$'lower level'
+write.table(plant_strength, "plant_strength")
+
+visweb(df1) 
+visweb(df1, type = "diagonal")
+networklevel(df1) 
+
+
+####
+frec2
+top10_per_species
+View(frec2)
+View(top10_per_species)
+
+# Corregir la columna sexo en visitantes
+frec2 <- frec2 %>%
+  mutate(sexo = case_when(
+    sexo == "H" ~ "hembra",
+    sexo == "M" ~ "macho",
+    TRUE        ~ sexo
+  ))
+
+# Verificar que quedó bien
+unique(frec2$sexo)
+# Debe decir: "hembra" "macho"
+
+# Volver a unir las tablas
+tabla_integrada <- left_join(
+  top10_per_species,
+  frec2,
+  by = c("condicion", "sexo")
+)
+
+# Verificar que ya no hay NAs
+head(tabla_integrada)
+View(tabla_integrada)
+sum(is.na(tabla_integrada$mean_freq))
+
+## Tabla que integra visitantes y bacterias
+integrada = tabla_integrada %>%
+  unite("plant_sex", condicion:sexo)
+View(integrada)
+# Matríz de bacterias
+df2 <- create.matrix(as.data.frame(integrada), tax.name = "Family",
+                    locality = "plant_sex",
+                    abund.col = "MeanRelAbund",
+                    abund = TRUE)
+df3 <- t(df2)
+# Matriz de visitantes
+df4 <- create.matrix(as.data.frame(integrada), tax.name = "especie",
+                     locality = "plant_sex",
+                     abund.col = "mean_frec",
+                     abund = TRUE)
+df5 <- t(df4)
+
+# Visualizar redes lado a lado
+par(mfrow = c(1, 2),
+    mar   = c(8, 2, 2, 2))
+# Red 1: plantas → bacterias
+plotweb(df3, sorting = "normal", higher_color = "#E6AB02",
+        lower_color = "#4D9221", horizontal = TRUE)
+
+# Red 2: visitantes → plantas
+plotweb(df5, sorting = "normal", higher_color = "#E6AB02",
+        lower_color = "#4D9221",horizontal = TRUE)
+
+# Verificando orientación de las redes
+# web1: filas = nivel inferior, columnas = nivel medio
+# web2: filas = nivel medio,    columnas = nivel superior
+
+# Verificar orientación
+dim(df5)  # visitantes × plantas
+dim(df3)  # plantas × bacterias
+
+# El nivel medio (plantas) debe coincidir:
+# colnames(web1) == rownames(web2)
+colnames(df5)  # deben ser las plantas
+rownames(df3)  # deben ser las plantas
+
+# Verificar que coinciden exactamente
+all(sort(colnames(df5)) == sort(rownames(df3)))
+
+# Transponer si es necesario
+# web1 necesita: filas=visitantes, columnas=plantas
+red_visitantes_ok <- t(df5)  # o t(red_visitantes)
+
+# web2 necesita: filas=plantas, columnas=bacterias
+red_microbiota_ok <- df3  # o t(red_microbiota)
+
+# colnames(web1) == rownames(web2)
+colnames(red_visitantes_ok)  # deben ser las plantas
+rownames(red_microbiota_ok)  # deben ser las plantas
+# Verificar que coinciden exactamente
+all(sort(colnames(red_visitantes_ok)) == sort(rownames(red_microbiota_ok)))
+
+
+plotweb2(red_microbiota_ok, red_visitantes_ok)
+
+
+
+# Normalizar cada matriz entre 0 y 1
+normalizar <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+red_vis_norm  <- normalizar(red_visitantes_ok)
+red_micro_norm <- normalizar(red_microbiota_ok)
+
+plotweb2(red_vis_norm, red_micro_norm, method = "normal")
+
+######################## Datos de volumen de néctar ############################
+volumen  = read.csv("flores_morelia.csv", header = T)
+head(volumen)
+str(volumen)
+volumen2 = subset(volumen, NV != 0)
+str(volumen2)
+
+
+
+#### Análisis de nectar entre tratamientos ####
+setwd("/home/luis/Documentos/3_Doctorado_UNAM/a-proyecto/analisis_florales_tesis_2022/datos_completos/")
+
+azu = read.csv("azucares_2022.csv", header = T)
+head(azu)
+str(azu)
+azu2 =subset(azu, sitio == "morelia")
+head(azu2)
+
+tapply(azu2$Suma.total, list(azu2$condicion, azu2$sexo, azu2$trat), length)
+
+shapiro.test(azu2$fructosa)
+shapiro.test(azu2$glucosa)
+shapiro.test(azu2$sacarosa)
+shapiro.test(azu2$Suma.total)
+
+mod1 = aov(azu2$Suma.total ~ azu2$condicion * azu2$sexo * azu2$trat)
+summary(mod1)
+
+# media
+media2 = azu2 %>%
+  dplyr::group_by(condicion, sexo, trat) %>%
+  dplyr::summarize(fruc_m = mean(fructosa), glu_m = mean(glucosa),
+                   sac_m = mean(sacarosa),
+                   tot_m = mean(Suma.total))
+media2
+# sd
+sd2 = azu2 %>%
+  dplyr::group_by(condicion, sexo, trat) %>%
+  dplyr::summarize(fruc_sd = sd(fructosa), glu_sd = sd(glucosa),
+                   sac_sd = sd(sacarosa),
+                   tot_sd = sd(Suma.total))
+sd2
+
+library(dplyr)
+resultado <- left_join(media2, sd2, by = c("condicion", "sexo", "trat"))
+resultado
+
+library(ggplot2)
+
+
+
+## Gráfica de concentración de fructosa
+fru1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion), 
+                             y = fruc_m,
+                             color = interaction(trat, sexo, condicion))) + #fill = condicion
+  geom_col(position = "dodge", width = 0.7,
+           fill = NA,
+           linewidth = 0.8) +
+  geom_errorbar(aes(ymin = fruc_m - fruc_sd, 
+                    ymax = fruc_m + fruc_sd),
+                width = 0.25) +
+  labs(
+    #title = "Azúcares totales por grupo experimental",
+    x = "",
+    y = "Fructose",
+    #fill = "Condición"
+  ) +
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+scale_color_manual(
+  name   = "Group",   # título de la leyenda
+  values = c(         # colores para cada combinación
+    "t1.h.domesticada" = "#E6AB02",
+    "t2.h.domesticada"  = "#4D9221",
+    "t1.m.domesticada"   = "#1F78B4",
+    "t2.m.domesticada"    = "#E31A1C",
+    "t1.h.silvestre" = "#FF7F00",
+    "t2.h.silvestre"  = "#6A3D9A",
+    "t1.m.silvestre"   = "#B15928",
+    "t2.m.silvestre"    = "#33A02C"
+  ),
+  labels = c(         # nombres que aparecen en la leyenda
+    "t1.h.domesticada" = "UDP",
+    "t2.h.domesticada"  = "VDP",
+    "t1.m.domesticada"   = "UDS",
+    "t2.m.domesticada"    = "VDS",
+    "t1.h.silvestre" = "UWP",
+    "t2.h.silvestre"  = "VWP",
+    "t1.m.silvestre"   = "UWS",
+    "t2.m.silvestre"    = "VWS"
+  )
+) + 
+  scale_x_discrete(labels=c("t1.h.domesticada" = "UDP",
+                            "t2.h.domesticada"  = "VDP",
+                            "t1.m.domesticada"   = "UDS",
+                            "t2.m.domesticada"    = "VDS",
+                            "t1.h.silvestre" = "UWP",
+                            "t2.h.silvestre"  = "VWP",
+                            "t1.m.silvestre"   = "UWS",
+                            "t2.m.silvestre"    = "VWS"))
+fru1
+
+## Gráfica de concentración de glucosa
+glu1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion), 
+                             y = glu_m,
+                             color = interaction(trat, sexo, condicion))) + #fill = condicion
+  geom_col(position = "dodge", width = 0.7,
+           fill = NA, linewidth = .8) +
+  geom_errorbar(aes(ymin = glu_m - glu_sd, 
+                    ymax = glu_m + glu_sd),
+                width = 0.25) +
+  labs(
+    #title = "Azúcares totales por grupo experimental",
+    x = "",
+    y = "Glucose",
+    #fill = "Condición"
+  ) +
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_manual(
+    name   = "Group",   # título de la leyenda
+    values = c(         # colores para cada combinación
+      "t1.h.domesticada" = "#E6AB02",
+      "t2.h.domesticada"  = "#4D9221",
+      "t1.m.domesticada"   = "#1F78B4",
+      "t2.m.domesticada"    = "#E31A1C",
+      "t1.h.silvestre" = "#FF7F00",
+      "t2.h.silvestre"  = "#6A3D9A",
+      "t1.m.silvestre"   = "#B15928",
+      "t2.m.silvestre"    = "#33A02C"
+    ),
+    labels = c(         # nombres que aparecen en la leyenda
+      "t1.h.domesticada" = "UDP",
+      "t2.h.domesticada"  = "VDP",
+      "t1.m.domesticada"   = "UDS",
+      "t2.m.domesticada"    = "VDS",
+      "t1.h.silvestre" = "UWP",
+      "t2.h.silvestre"  = "VWP",
+      "t1.m.silvestre"   = "UWS",
+      "t2.m.silvestre"    = "VWS"
+    )
+  ) + 
+  scale_x_discrete(labels=c("t1.h.domesticada" = "UDP",
+                            "t2.h.domesticada"  = "VDP",
+                            "t1.m.domesticada"   = "UDS",
+                            "t2.m.domesticada"    = "VDS",
+                            "t1.h.silvestre" = "UWP",
+                            "t2.h.silvestre"  = "VWP",
+                            "t1.m.silvestre"   = "UWS",
+                            "t2.m.silvestre"    = "VWS"))
+glu1
+## Gráfica de concentración de sacarosa
+sac1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion), 
+                             y = sac_m,
+                             color = interaction(trat, sexo, condicion))) + #fill = condicion
+  geom_col(position = "dodge", width = 0.7,
+           fill = NA, linewidth = .8) +
+  geom_errorbar(aes(ymin = sac_m - sac_sd, 
+                    ymax = sac_m + sac_sd),
+                width = 0.25) +
+  labs(
+    #title = "Azúcares totales por grupo experimental",
+    x = "",
+    y = "Sacarose",
+    #fill = "Condición"
+  ) +
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_manual(
+    name   = "Group",   # título de la leyenda
+    values = c(         # colores para cada combinación
+      "t1.h.domesticada" = "#E6AB02",
+      "t2.h.domesticada"  = "#4D9221",
+      "t1.m.domesticada"   = "#1F78B4",
+      "t2.m.domesticada"    = "#E31A1C",
+      "t1.h.silvestre" = "#FF7F00",
+      "t2.h.silvestre"  = "#6A3D9A",
+      "t1.m.silvestre"   = "#B15928",
+      "t2.m.silvestre"    = "#33A02C"
+    ),
+    labels = c(         # nombres que aparecen en la leyenda
+      "t1.h.domesticada" = "UDP",
+      "t2.h.domesticada"  = "VDP",
+      "t1.m.domesticada"   = "UDS",
+      "t2.m.domesticada"    = "VDS",
+      "t1.h.silvestre" = "UWP",
+      "t2.h.silvestre"  = "VWP",
+      "t1.m.silvestre"   = "UWS",
+      "t2.m.silvestre"    = "VWS"
+    )
+  ) + 
+  scale_x_discrete(labels=c("t1.h.domesticada" = "UDP",
+                            "t2.h.domesticada"  = "VDP",
+                            "t1.m.domesticada"   = "UDS",
+                            "t2.m.domesticada"    = "VDS",
+                            "t1.h.silvestre" = "UWP",
+                            "t2.h.silvestre"  = "VWP",
+                            "t1.m.silvestre"   = "UWS",
+                            "t2.m.silvestre"    = "VWS"))
+
+sac1
+## Gráfica de concentración total de azucar
+total1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion), 
+                               y = tot_m,
+                               color = interaction(trat, sexo, condicion))) + #fill = condicion
+  geom_col(position = "dodge", width = 0.7,
+           fill = NA, linewidth = .8) +
+  geom_errorbar(aes(ymin = tot_m - tot_sd, 
+                    ymax = tot_m + tot_sd),
+                width = 0.25) +
+  labs(
+    #title = "Azúcares totales por grupo experimental",
+    x = "",
+    y = "Total concentration",
+    #fill = "Condición"
+  ) +
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_manual(
+    name   = "Group",   # título de la leyenda
+    values = c(         # colores para cada combinación
+      "t1.h.domesticada" = "#E6AB02",
+      "t2.h.domesticada"  = "#4D9221",
+      "t1.m.domesticada"   = "#1F78B4",
+      "t2.m.domesticada"    = "#E31A1C",
+      "t1.h.silvestre" = "#FF7F00",
+      "t2.h.silvestre"  = "#6A3D9A",
+      "t1.m.silvestre"   = "#B15928",
+      "t2.m.silvestre"    = "#33A02C"
+    ),
+    labels = c(         # nombres que aparecen en la leyenda
+      "t1.h.domesticada" = "UDP",
+      "t2.h.domesticada"  = "VDP",
+      "t1.m.domesticada"   = "UDS",
+      "t2.m.domesticada"    = "VDS",
+      "t1.h.silvestre" = "UWP",
+      "t2.h.silvestre"  = "VWP",
+      "t1.m.silvestre"   = "UWS",
+      "t2.m.silvestre"    = "VWS"
+    )
+  ) + 
+  scale_x_discrete(labels=c("t1.h.domesticada" = "UDP",
+                            "t2.h.domesticada"  = "VDP",
+                            "t1.m.domesticada"   = "UDS",
+                            "t2.m.domesticada"    = "VDS",
+                            "t1.h.silvestre" = "UWP",
+                            "t2.h.silvestre"  = "VWP",
+                            "t1.m.silvestre"   = "UWS",
+                            "t2.m.silvestre"    = "VWS"))
+
+total1
+
+library(gridExtra)
+library(cowplot)
+library(ggpubr)
+
+# joining plots (2 plots by spp)
+gt <- ggarrange(fru1, glu1, sac1, total1,
+                ncol = 2, nrow = 2, common.legend = TRUE, legend = "right",
+                labels="AUTO")
+gt
+
+gt <- ggarrange(fru1, glu1, sac1, total1,
+                ncol = 2, nrow = 2, legend = "none",
+                labels="AUTO")
+gt
 
 

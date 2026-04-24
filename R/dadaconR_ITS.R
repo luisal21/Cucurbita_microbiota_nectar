@@ -3025,10 +3025,129 @@ plot_taxa_prevalence(p0, "Order", detection = 0.1/100)
 plot_taxa_prevalence(p0, "Family", detection = 0.1/100)
 
 ###############################################################################
+library(rentrez)
+
+# Ver cuántas secuencias existen en total
+query_all_fungi <- 'ITS2[All Fields] AND Fungi[Organism]'
+
+busqueda_total <- entrez_search(
+  db          = "nucleotide",
+  term        = query_all_fungi,
+  retmax      = 0,
+  use_history = TRUE
+)
+
+cat("Total secuencias ITS2 de hongos en GenBank:", busqueda_total$count, "\n")
 
 
 
+library(rentrez)
+
+# Ver cuántas hay por phylum principal
+phylums <- list(
+  Ascomycota    = 'ITS2[All Fields] AND Ascomycota[Organism]',
+  Basidiomycota = 'ITS2[All Fields] AND Basidiomycota[Organism]',
+  Mucoromycota  = 'ITS2[All Fields] AND Mucoromycota[Organism]',
+  Chytridiomycota = 'ITS2[All Fields] AND Chytridiomycota[Organism]',
+  Glomeromycota = 'ITS2[All Fields] AND Glomeromycota[Organism]'
+)
+
+for(nombre in names(phylums)){
+  r <- entrez_search(db = "nucleotide", term = phylums[[nombre]],
+                     retmax = 0, use_history = TRUE)
+  cat(nombre, ":", r$count, "\n")
+  Sys.sleep(0.3)
+}
 
 
 
+###########
+# txid4751 = Fungi (ID taxonómico directo)
+# equivalente a Fungi[Organism] pero más preciso
 
+query_its_hongos <- 'txid4751[ORGN] AND 
+                     (internal transcribed spacer ITS2[Title] OR 
+                      ITS2[Title] OR 
+                      internal transcribed spacer 2[Title])'
+
+busqueda_hongos <- entrez_search(
+  db          = "nucleotide",
+  term        = query_its_hongos,
+  retmax      = 0,
+  use_history = TRUE
+)
+cat("Total ITS2 hongos (query con txid):", busqueda_hongos$count, "\n")
+
+# Comparar con tu query anterior
+query_anterior <- 'ITS2[All Fields] AND Fungi[Organism]'
+busqueda_anterior <- entrez_search(
+  db     = "nucleotide",
+  term   = query_anterior,
+  retmax = 0,
+  use_history = TRUE
+)
+cat("Total ITS2 hongos (query anterior):", busqueda_anterior$count, "\n")
+
+
+
+##############################################################################
+library(rentrez)
+
+# Query mejorado con txid
+query_hongos_completo <- 'txid4751[ORGN] AND 
+                          (ITS2[Title] OR 
+                           "internal transcribed spacer ITS2"[Title] OR
+                           "internal transcribed spacer 2"[Title])'
+
+# Ver total
+busqueda <- entrez_search(
+  db          = "nucleotide",
+  term        = query_hongos_completo,
+  retmax      = 0,
+  use_history = TRUE
+)
+cat("Total:", busqueda$count, "\n")
+
+
+## 2
+# cambiar directorio
+setwd("/home/luis/")
+
+library(Biostrings)
+library(dplyr)
+
+# Paso 1: Leer
+cat("Leyendo archivo...\n")
+seqs_raw <- readDNAStringSet("hongos_ITS2_completo.fasta")
+cat("Total descargadas:", length(seqs_raw), "\n")
+
+# Paso 2: Eliminar duplicados por ID
+seqs_unicas <- seqs_raw[!duplicated(names(seqs_raw))]
+cat("Secuencias únicas:", length(seqs_unicas), "\n")
+
+# Paso 3: Filtrar por longitud
+# guardar amplio para ITSx (200-900 bp)
+seqs_long <- seqs_unicas[
+  width(seqs_unicas) >= 200 &
+    width(seqs_unicas) <= 900
+]
+cat("Después de filtrar por longitud:", length(seqs_long), "\n")
+
+# Paso 4: Filtrar Ns excesivos
+prop_n <- letterFrequency(seqs_long, "N") / width(seqs_long)
+seqs_limpias <- seqs_long[prop_n < 0.10]
+cat("Después de filtrar Ns:", length(seqs_limpias), "\n")
+
+# Paso 5: Ver distribución de longitudes
+summary(width(seqs_limpias))
+hist(width(seqs_limpias),
+     breaks = 50,
+     main   = "Distribución de longitudes ITS hongos",
+     xlab   = "Longitud (bp)",
+     col    = "steelblue",
+     border = "white")
+abline(v = c(200, 500), col = "red", lty = 2)
+
+# Paso 6: Guardar versión limpia para ITSx
+writeXStringSet(seqs_limpias, "hongos_ITS2_genbank_clean.fasta")
+cat("✓ Archivo listo para ITSx\n")

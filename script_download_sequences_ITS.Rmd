@@ -1,0 +1,110 @@
+---
+title: "Descarga_ITS2"
+author: "Luis Alberto Villanueva Espino"
+date: "2026-04-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Paso 1: Explorar cuantas secuencias tenemos con los terminos de busqueda
+```{r, echo=FALSE}
+library(rentrez)
+
+# Query mejorado con txid
+query_hongos_completo <- 'txid4751[ORGN] AND 
+                          (ITS2[Title] OR 
+                           "internal transcribed spacer ITS2"[Title] OR
+                           "internal transcribed spacer 2"[Title])'
+
+# Ver total
+busqueda <- entrez_search(
+  db          = "nucleotide",
+  term        = query_hongos_completo,
+  retmax      = 0,
+  use_history = TRUE
+)
+cat("Total:", busqueda$count, "\n")
+```
+
+## Paso 2: Descarga Completa de Todas las Secuencias ITS2 de Hongos
+```{bash}
+# Activar ambiente con EDirect
+conda activate edirect_env
+
+# Lanzar descarga completa en segundo plano
+# nohup → sigue corriendo si cierras la terminal
+# & → proceso en segundo plano
+nohup esearch -db nucleotide \
+  -query 'txid4751[ORGN] AND (ITS2[Title] OR "internal transcribed spacer ITS2"[Title] OR "internal transcribed spacer 2"[Title])' | \
+efetch -format fasta > hongos_ITS2_completo.fasta &
+
+# Guarda el número de proceso
+echo "PID del proceso: $!"
+
+# Monitorear el progreso
+grep -c ">" hongos_ITS2_completo.fasta
+
+# Verificar que terminó correctamente
+# Cuando el proceso termine verificar
+grep -c ">" hongos_ITS2_completo.fasta
+
+# Debería ser cercano a 1,642,226
+# Ver tamaño final del archivo
+du -sh hongos_ITS2_completo.fasta
+
+# Ver las primeras y últimas secuencias
+head -20 hongos_ITS2_completo.fasta
+tail -20 hongos_ITS2_completo.fasta
+
+```
+
+### Paso 3: Limpiar y verificar en R
+```{r}
+# cambiar directorio
+setwd("/home/luis/")
+
+library(Biostrings)
+library(dplyr)
+
+# Paso 1: Leer
+cat("Leyendo archivo...\n")
+seqs_raw <- readDNAStringSet("hongos_ITS2_completo.fasta")
+cat("Total descargadas:", length(seqs_raw), "\n")
+
+# Paso 2: Eliminar duplicados por ID
+seqs_unicas <- seqs_raw[!duplicated(names(seqs_raw))]
+cat("Secuencias únicas:", length(seqs_unicas), "\n")
+
+# Paso 3: Filtrar por longitud
+# guardar amplio para ITSx (200-900 bp)
+seqs_long <- seqs_unicas[
+  width(seqs_unicas) >= 200 &
+  width(seqs_unicas) <= 900
+]
+cat("Después de filtrar por longitud:", length(seqs_long), "\n")
+
+# Paso 4: Filtrar Ns excesivos
+prop_n <- letterFrequency(seqs_long, "N") / width(seqs_long)
+seqs_limpias <- seqs_long[prop_n < 0.10]
+cat("Después de filtrar Ns:", length(seqs_limpias), "\n")
+
+# Paso 5: Ver distribución de longitudes
+summary(width(seqs_limpias))
+hist(width(seqs_limpias),
+     breaks = 50,
+     main   = "Distribución de longitudes ITS hongos",
+     xlab   = "Longitud (bp)",
+     col    = "steelblue",
+     border = "white")
+abline(v = c(200, 500), col = "red", lty = 2)
+
+# Paso 6: Guardar versión limpia para ITSx
+writeXStringSet(seqs_limpias, "hongos_ITS2_genbank_clean.fasta")
+cat("✓ Archivo listo para ITSx\n")
+```
+
+

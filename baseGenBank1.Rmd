@@ -6,8 +6,16 @@ output:
 date: "2026-04-09"
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  eval = FALSE,
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE)
+```
+
 ##Paso 1: Explorar términos adicionales antes de descargar
-```{r, echo=FALSE}
+```{r}
 library(rentrez)
 
 # Primero ver cuántas secuencias hay con términos adicionales

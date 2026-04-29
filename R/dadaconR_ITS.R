@@ -367,31 +367,7 @@ head(taxa.print)
 write.csv(taxa.print, file = "taxa_fungi_all_8.csv")
 
 
-#### Analysis post-taxonomic assignation
-### change directory
-setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
 
-# Cargando paquete phyloseq y paquetes adicionales
-library(phyloseq); packageVersion("phyloseq")
-library(ggplot2)
-library(picante)
-library(ape)
-library("microbiome")
-library("dplyr")
-#library("tidyverse")
-library("RColorBrewer")
-library("ggpubr")
-#library("breakaway") # no instalado
-#library(MicrobiotaProcess)
-#library(reltools)
-library(microbiomeutilities)
-library(vegan)
-library(gridExtra)
-library(tidyr)
-library(reshape2)
-#library(minpack.lm) # no instalado
-library(Hmisc)
-library(stats4)
 
 #library(patchwork) # no instalado
 

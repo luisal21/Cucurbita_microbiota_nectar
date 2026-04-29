@@ -786,7 +786,7 @@ ggplot(hill_valores, aes(x = Assemblage, y = qD)) +
                              "Sil-Macho-t2" = "WSV"))
 
 ###############################################################################
-################
+################ BETA DIVERSITY OF BACTERIA
 BiocManager::install("DECIPHER")
 
 # Cargando paquetes

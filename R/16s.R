@@ -40,6 +40,7 @@ setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_m
 # deshabilitar este codigo
 ### Transponer tabla de ASV
 #asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
+#head(asvtable, 1)
 #asv2 = t(asvtable)
 #head(asv2, 1)
 #write.csv(asv2, file = "asv_table.csv")
@@ -49,7 +50,8 @@ meta_16s <- read.csv("meta_16s_2024.csv", header = T)
 head(meta_16s)
 # despues cargar la tabla de ASV
 seqtab.16s <- read.csv("asv_table.csv", header = T, row.names = 1)
-#head(seqtab.16s)
+head(seqtab.16s)
+View(seqtab.16s)
 #tail(seqtab.16s)
 str(seqtab.16s)
 # Debido a que al cargar el archivo agrega una X al principio del nombre de
@@ -1199,8 +1201,57 @@ ggplot(df_long, aes(x = comp_condicion, y = valor,
        fill  = "Comparación de tratamiento")
 
 ###############################################################################
+### Código para Top 10 Familias Global (Sin Agrupar por Variables)
+# A. Aglomerar a nivel de Familia
+ps_fam1 <- tax_glom(s16_6, taxrank = "Family", NArm = FALSE)
+
+# B. Transformar a abundancia relativa
+ps_rel1 <- transform_sample_counts(ps_fam1, function(x) x / sum(x))
+
+# C. Psmelt
+df_melt1 <- psmelt(ps_rel1)
+
+# D. Agrupar SOLO por Familia (sin condicion ni sexo)
+df_grouped_global <- df_melt1 %>%
+  dplyr::group_by(Family) %>%                          # ← solo Family
+  dplyr::summarize(MeanRelAbund = mean(Abundance),
+                   .groups = "drop") %>%
+  arrange(desc(MeanRelAbund))                          # ordenar de mayor a menor
+
+# Ver el resultado
+print(df_grouped_global, n = 20)
+
+# E. Top 10 familias más abundantes globalmente
+top10_global <- df_grouped_global %>%
+  slice_max(order_by = MeanRelAbund, n = 10,
+            with_ties = FALSE)
+
+cat("Top 10 familias más abundantes:\n")
+print(top10_global)
+write.csv(top10_global, file = "top10_familias_bacterias.csv")
+
+# F. Crear categoría "Other" para el resto
+df_final_global <- df_grouped_global %>%
+  mutate(Taxonomy_Display = ifelse(
+    Family %in% top10_global$Family,
+    as.character(Family),
+    "Other"
+  )) %>%
+  group_by(Taxonomy_Display) %>%
+  dplyr::summarize(TotalMeanAbund = sum(MeanRelAbund),
+            .groups = "drop") %>%
+  mutate(Percentage = TotalMeanAbund * 100) %>%
+  arrange(desc(TotalMeanAbund))
+
+# Verificar que suma 100%
+cat("Suma total:", sum(df_final_global$Percentage), "%\n")
+
+View(df_final_global)
+write.csv(df_final_global, "abundancias_top10_global.csv")
+
 ###############################################################################
-#### EXTRAYENDO LAS MUESTRAS DE FLORES VISITADAS
+#### EXTRAYENDO LAS MUESTRAS DE FLORES VISITADAS PARA CONSTRUIR REDES
+### DE INTERACCIÓN
 visitadas <- subset_samples(ps_con_arbol, tratamiento == "t2")
 visitadas
 
@@ -3976,7 +4027,12 @@ setwd("/home/luis/Documentos/3_Doctorado_UNAM/a-proyecto/analisis_florales_tesis
 more2021 <- read.csv("visitas_morelia_2021.csv", header = T)
 head(more2021)
 str(more2021)
+more2021$ID.planta
+more2021$codigo.video
 
+# Cargando librerias
+library(fossil)
+library (bipartite)
 
 
 ### Horas totales de grabación entre 2021 y 2022: 128:52:28
@@ -4030,8 +4086,6 @@ ggplot(more2021, aes(condicion, fill = especie))+
   facet_grid(.~ sexo)
 
 ### Realizando redes de interacción ###
-library(fossil)
-
 visitas2 = visitas %>%
   unite("plant_sex", condicion:sexo)
 df_vis <- create.matrix(as.data.frame(visitas2), tax.name = "especie",
@@ -4052,7 +4106,7 @@ df <- create.matrix(as.data.frame(frec3), tax.name = "especie",
 df1 <- t(df)
 
 #cargar la libreria bipartite
-library (bipartite)
+
 
 #Dibujar la red de interacciones
 # numero de visita
@@ -4087,7 +4141,8 @@ visweb(df1, type = "diagonal")
 networklevel(df1) 
 
 
-####
+#### Cargando las 2 bases de datos, de frecuencia de visita y de 
+### bacterias 
 frec2
 top10_per_species
 View(frec2)
@@ -4115,7 +4170,7 @@ tabla_integrada <- left_join(
 # Verificar que ya no hay NAs
 head(tabla_integrada)
 View(tabla_integrada)
-sum(is.na(tabla_integrada$mean_freq))
+sum(is.na(tabla_integrada$mean_frec))
 
 ## Tabla que integra visitantes y bacterias
 integrada = tabla_integrada %>%
@@ -4127,6 +4182,24 @@ df2 <- create.matrix(as.data.frame(integrada), tax.name = "Family",
                     abund.col = "MeanRelAbund",
                     abund = TRUE)
 df3 <- t(df2)
+# 
+specieslevel(df3)
+beeR<-specieslevel(df3)
+summary(beeR)
+str(beeR)
+class(beeR)
+
+#Calcular la m?tricas de red y guardarlos en un archivo de texto
+bee_strength <- beeR$'higher level'
+write.table(bee_strength, "bee_strength")
+
+plant_strength<-beeR$'lower level'
+write.table(plant_strength, "plant_strength")
+
+visweb(df3) 
+visweb(df3, type = "diagonal")
+networklevel(df3) 
+
 # Matriz de visitantes
 df4 <- create.matrix(as.data.frame(integrada), tax.name = "especie",
                      locality = "plant_sex",
@@ -4175,7 +4248,7 @@ rownames(red_microbiota_ok)  # deben ser las plantas
 all(sort(colnames(red_visitantes_ok)) == sort(rownames(red_microbiota_ok)))
 
 
-plotweb2(red_microbiota_ok, red_visitantes_ok)
+plotweb2(red_microbiota_ok, red_visitantes_ok, method = "normal")
 
 
 
@@ -4214,8 +4287,14 @@ shapiro.test(azu2$glucosa)
 shapiro.test(azu2$sacarosa)
 shapiro.test(azu2$Suma.total)
 
+
+hist(azu2$Suma.total)
+
+
 mod1 = aov(azu2$Suma.total ~ azu2$condicion * azu2$sexo * azu2$trat)
 summary(mod1)
+
+TukeyHSD(mod1)
 
 # media
 media2 = azu2 %>%
@@ -4237,8 +4316,6 @@ resultado <- left_join(media2, sd2, by = c("condicion", "sexo", "trat"))
 resultado
 
 library(ggplot2)
-
-
 
 ## Gráfica de concentración de fructosa
 fru1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion), 
@@ -4391,6 +4468,11 @@ sac1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion),
 
 sac1
 ## Gráfica de concentración total de azucar
+total = ggplot(azu2, aes(x = trat,
+                         y = Suma.total,
+                         color = trat))+
+  geom_boxplot()
+
 total1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion), 
                                y = tot_m,
                                color = interaction(trat, sexo, condicion))) + #fill = condicion
@@ -4402,13 +4484,13 @@ total1 = ggplot(resultado, aes(x = interaction(trat, sexo, condicion),
   labs(
     #title = "Azúcares totales por grupo experimental",
     x = "",
-    y = "Total concentration",
+    y = "Total Sugar Concentration (w/v)",
     #fill = "Condición"
   ) +
   theme_classic()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   scale_color_manual(
-    name   = "Group",   # título de la leyenda
+    name   = "Groups",   # título de la leyenda
     values = c(         # colores para cada combinación
       "t1.h.domesticada" = "#E6AB02",
       "t2.h.domesticada"  = "#4D9221",

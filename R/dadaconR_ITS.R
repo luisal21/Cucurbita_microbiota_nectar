@@ -426,7 +426,7 @@ head(taxo_its)
 # corrobando match entre archivos
 setdiff(rownames(taxo_its), rownames(seqtab.its))
 all(rownames(seqtab.its) == rownames(taxo_its))
-all(colnames(seqtab.its) == unlist(meta_its2[,'sample.id']))
+all(colnames(seqtab.its) == rownames(meta_its2))
 
 # Construct phyloseq object (straightforward from dada2 outputs)
 its1 <- phyloseq(otu_table(as.matrix(seqtab.its), taxa_are_rows=T),
@@ -3151,3 +3151,77 @@ abline(v = c(200, 500), col = "red", lty = 2)
 # Paso 6: Guardar versión limpia para ITSx
 writeXStringSet(seqs_limpias, "hongos_ITS2_genbank_clean.fasta")
 cat("✓ Archivo listo para ITSx\n")
+
+##############################################################################
+# Prueba para detectar secuencias iguales con nombres diferentes
+library(Biostrings)
+library(dplyr)
+
+### change directory
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar")
+
+# Leer la base combinada
+base <- readDNAStringSet("base_ITS2_UNITE_GenBank_DADA2.fasta")
+cat("Total secuencias:", length(base), "\n")
+
+# Extraer secuencias como strings
+seqs    <- as.character(base)
+headers <- names(base)
+
+# Crear dataframe con secuencia y taxonomía
+df_base <- data.frame(
+  header   = headers,
+  taxonomy = headers,   # en DADA2 el header ES la taxonomía
+  sequence = seqs,
+  stringsAsFactors = FALSE
+)
+
+head(df_base)
+
+### Paso 2: Detectar secuencias duplicadas con diferente taxonomía
+# Agrupar por secuencia y contar cuántas taxonomías diferentes tiene
+duplicados_tax <- df_base %>%
+  group_by(sequence) %>%
+  summarise(
+    n_taxonomias    = n_distinct(taxonomy),
+    taxonomias      = paste(unique(taxonomy), collapse = " | "),
+    n_ocurrencias   = n(),
+    .groups = "drop"
+  ) %>%
+  filter(n_taxonomias > 1) %>%  # solo las que tienen >1 taxonomía
+  arrange(desc(n_taxonomias))
+
+cat("Secuencias con taxonomía conflictiva:", nrow(duplicados_tax), "\n")
+print(duplicados_tax)
+View(duplicados_tax)
+write.csv(duplicados_tax, file = "duplicados_prueba.csv")
+
+
+### Paso 3:
+# Ver cuántos conflictos hay por nivel taxonómico
+if(nrow(duplicados_tax) > 0) {
+  
+  # Separar taxonomías para comparar nivel por nivel
+  conflictos_detalle <- duplicados_tax %>%
+    rowwise() %>%
+    mutate(
+      tax_list = list(strsplit(taxonomias, " \\| ")[[1]])
+    ) %>%
+    ungroup()
+  
+  # Ver los primeros conflictos
+  cat("\nPrimeros conflictos encontrados:\n")
+  for(i in 1:min(5, nrow(duplicados_tax))){
+    cat("\n--- Conflicto", i, "---\n")
+    cat("Secuencia:", substr(duplicados_tax$sequence[i], 1, 50), "...\n")
+    cat("Taxonomías:\n")
+    tax_split <- strsplit(duplicados_tax$taxonomias[i], " \\| ")[[1]]
+    for(t in tax_split) cat(" →", t, "\n")
+  }
+}
+
+
+CAACCCTCGAACCCCTCCGGGGGGTCGGCGTTGGGGATCGGCCCTCCCTTAGCGGGTGGCCGTCTCCGAAATACAGTGGC
+
+GGTCTCGCCGCAGCCTCTCCTGCGCAGTAGTTTGCACACTCGCATCGGGAGCGCGGCGCGTCCACAGCCGTTAAACACCC
+AACTTCTGAAA

@@ -193,17 +193,21 @@ E2 <- resid(mod_q0, type = "pearson")
 sum(E2^2) / df.residual(mod_q0)
 
 library(MASS)
+library(car)
+# q0 modelo bueno
 mod_q0 <- glm.nb(q0 ~ condicion * sexo * tratamiento, 
               data = hill_df,
               link = "log")
 summary(mod_q0)
-Anova(mod_q0)
 
+#q1
 mod_q1 <- glm(q1 ~ condicion * sexo * tratamiento, 
               data = hill_df,
               family = Gamma(link = "log"))
 
 summary(mod_q1)
+
+# q2
 mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
               data = hill_df,
               family = Gamma(link = "log"))
@@ -216,9 +220,31 @@ Anova(mod_q0)
 Anova(mod_q1)
 Anova(mod_q2)
 
+tapply(hill_df$q0, hill_df$sexo, mean)
+tapply(hill_df$q0, hill_df$sexo, sd)
+
+tapply(hill_df$q0, list(hill_df$condicion,hill_df$sexo,
+                        hill_df$tratamiento), mean)
+tapply(hill_df$q0, list(hill_df$condicion,hill_df$sexo,
+                        hill_df$tratamiento), sd)
+
+#q1
+tapply(hill_df$q1, list(hill_df$condicion,hill_df$sexo,
+                        hill_df$tratamiento), mean)
+tapply(hill_df$q1, list(hill_df$condicion,hill_df$sexo,
+                        hill_df$tratamiento), sd)
+#q2
+tapply(hill_df$q2, list(hill_df$condicion,hill_df$sexo,
+                        hill_df$tratamiento), mean)
+tapply(hill_df$q2, list(hill_df$condicion,hill_df$sexo,
+                        hill_df$tratamiento), sd)
+
+
+tapply(hill_df$q0, hill_df$tratamiento, mean)
+tapply(hill_df$q0, hill_df$tratamiento, sd)
+
 boxplot(hill_df$q0 ~ hill_df$sexo)
 boxplot(hill_df$q0 ~ hill_df$tratamiento)
-boxplot(hill_df$q0 ~ hill_df$condicion + hill_df$sexo)
 
 ###   CURVAS DE RAREFACCIÓN
 ### POR CONDICIÓN

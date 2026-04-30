@@ -367,11 +367,6 @@ head(taxa.print)
 write.csv(taxa.print, file = "taxa_fungi_all_8.csv")
 
 
-
-
-#library(patchwork) # no instalado
-
-
 ### Transponer tabla de ASV
 #seqtab.nochim2 <- read.csv("asv_tabla.csv", header = T, row.names = 1)
 #asvtable <- read.csv("seqtab_nochim_minlen50.csv", header = T, row.names = 1)
@@ -524,14 +519,7 @@ plot_bar(ps_rel_abund, fill = "Class") +
 #plot_bar(its2_5_re, fill="Phylum") +
 #  geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
-# checking correlation between reads and ASVs observados
-ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(its6),
-                         "observed" = phyloseq::estimate_richness(its6,
-                           measures = "Observed")[, 1]),
-       aes(x = total_reads, y = observed)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE) +
-  labs(x = "\nTotal Reads", y = "Observed Richness\n")
+
 
 ##############################################################################
 ps_fam_its <- tax_glom(its6, taxrank = "Family", NArm = FALSE)

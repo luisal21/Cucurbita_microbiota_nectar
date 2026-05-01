@@ -51,7 +51,6 @@ head(meta_16s)
 # despues cargar la tabla de ASV
 seqtab.16s <- read.csv("asv_table.csv", header = T, row.names = 1)
 head(seqtab.16s)
-View(seqtab.16s)
 #tail(seqtab.16s)
 str(seqtab.16s)
 # Debido a que al cargar el archivo agrega una X al principio del nombre de
@@ -280,25 +279,8 @@ meta <- as.data.frame(sample_data(s16_6))
 hill_df <- merge(hill_df, meta, by = "row.names")
 View(hill_df)
 
-# Paso 2: Análisis estadístico con tus variables
-# Para cada orden de Hill
-mod_q0 <- glm(q0 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              family = gaussian())
 
-mod_q1 <- glm(q1 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              family = gaussian())
 
-mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              family = gaussian())
-
-# ANOVA tipo II
-library(car)
-Anova(mod_q0)
-Anova(mod_q1)
-Anova(mod_q2)
 
 
 ###   CURVAS DE RAREFACCIÓN
@@ -352,6 +334,94 @@ coverage_incidence_con <- estimateD(asv_por_condicion,
                                 base = "coverage",
                                 conf = 0.95, nboot = 100)
 coverage_incidence_con
+unique(coverage_incidence_con$SC)
+
+### Estimando los numeros de Hill con la función estimateD por cobertura
+coverage_incidence <- estimateD(asv_table,
+                                q = c(0, 1, 2),
+                                datatype = "abundance",
+                                base = "coverage",
+                                conf = 0.95, nboot = 100)
+coverage_incidence
+unique(coverage_incidence$SC)
+View(coverage_incidence)
+
+# Uniendo tabla de estimateD con metadatos
+library(dplyr)
+library(tidyr)
+# Uniendo tablas
+hill_wide_ic <- coverage_incidence %>%
+  filter(Method == "Observed") %>%
+  dplyr::select(Assemblage, Order.q, qD, qD.LCL, qD.UCL) %>%
+  pivot_wider(names_from  = Order.q,
+              values_from = c(qD, qD.LCL, qD.UCL),
+              names_sep   = "_q") %>%    # genera qD_q0, qD.LCL_q0, etc.
+  rename(sampleid2 = Assemblage) %>%
+  left_join(metadata, by = "sampleid2")
+# Verificando
+colnames(hill_wide_ic)
+head(hill_wide_ic)
+
+# Paso 1: histogramas de Hill numbers
+hist(hill_wide_ic$qD_q0)
+hist(hill_wide_ic$qD_q1)
+hist(hill_wide_ic$qD_q2)
+
+shapiro.test(hill_wide_ic$qD_q0)
+shapiro.test(hill_wide_ic$qD_q1)
+shapiro.test(hill_wide_ic$qD_q2)
+
+# Paso 2: Análisis estadístico con tus variables
+# Para cada orden de Hill
+# Modelo con q0
+mod_q0 <- glm(qD_q0 ~ condicion * sexo * tratamiento, 
+              data = hill_wide_ic,
+              family = poisson())
+summary(mod_q0)
+# Calcular ratio de dispersión (debe ser ~1 si no hay sobredispersión)
+E2 <- resid(mod_q0, type = "pearson")
+sum(E2^2) / df.residual(mod_q0)
+# Modelo con q0 binomial negativo
+library(MASS)
+# q0 modelo bueno
+modnb_q0 <- glm.nb(qD_q0 ~ condicion * sexo * tratamiento, 
+                 data = hill_wide_ic,
+                 link = "log")
+summary(modnb_q0)
+# Modelo con q1
+mod_q1 <- glm(qD_q1 ~ condicion * sexo * tratamiento, 
+              data = hill_wide_ic,
+              family = Gamma(link = "log"))
+summary(mod_q1)
+# Modelo con q2
+mod_q2 <- glm(qD_q2 ~ condicion * sexo * tratamiento, 
+              data = hill_wide_ic,
+              family = Gamma(link = "log"))
+summary(mod_q2)
+
+# ANOVA tipo II
+library(car)
+Anova(modnb_q0)
+Anova(mod_q1)
+Anova(mod_q2)
+
+# Summary
+#q0
+tapply(hill_wide_ic$qD_q0, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
+                                hill_wide_ic$tratamiento), mean)
+tapply(hill_wide_ic$qD_q0, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
+                        hill_wide_ic$tratamiento), sd)
+#q1
+tapply(hill_wide_ic$qD_q1, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
+                        hill_wide_ic$tratamiento), mean)
+tapply(hill_wide_ic$qD_q1, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
+                        hill_wide_ic$tratamiento), sd)
+#q2
+tapply(hill_wide_ic$qD_q2, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
+                        hill_wide_ic$tratamiento), mean)
+tapply(hill_wide_ic$qD_q2, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
+                        hill_wide_ic$tratamiento), sd)
+
 
 # Gráfica de curvas de cobertura de muestra
 # Ver qué tan completo está cada muestra/grupo
@@ -1199,6 +1269,327 @@ ggplot(df_long, aes(x = comp_condicion, y = valor,
        x     = "Condición",
        y     = "Distancia de Jaccard",
        fill  = "Comparación de tratamiento")
+
+
+###############################################################################
+###############################################################################
+# install microViz
+#remotes::install_github("david-barnett/microViz")
+library("microViz")
+library(phyloseq)
+library(ggplot2)
+library(patchwork) # for arranging groups of plots
+
+
+# Paquete microbiome
+# 16S
+# Paquete microbiome
+transform <- microbiome::transform
+s16_prop <- transform(s16_6, "compositional")
+otu_table(s16_prop)[1:10, 1:10]
+head(sample_sums(s16_prop))
+
+s16_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+# modificada
+s16_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+
+# ITS (fungi)
+transform <- microbiome::transform
+ps_prop <- transform(s16_6, "compositional")
+otu_table(ps_prop)[1:10, 1:10]
+head(sample_sums(ps_prop))
+
+ps_prop %>%
+  tax_fix() %>%
+  comp_barplot(tax_level = "Genus", n_taxa = 15, facet_by = "tratamiento",
+               group_by = "")+
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+#facet_grid(labeller = labeller(tratamiento = trata))
+
+###############################################################################
+###############################################################################
+### ANÁLISIS CON DESEQ2
+# Paso 1. Instalar y cargar paquetes
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+# install.packages("BiocManager")
+#BiocManager::install("DESeq2")
+library(DESeq2)
+library(phyloseq)
+
+# 2. Convertir phyloseq a DESeq2
+# primero agrupar a nivel de familia
+s16_familia <- tax_glom(s16_6, taxrank = "Family")
+# Para la comparación por condición (domesticated vs wild)
+ds_condicion <- phyloseq_to_deseq2(s16_familia, ~ condicion)
+# 3. Estimar factores de tamaño con conteos cero
+ds_condicion <- estimateSizeFactors(ds_condicion, 
+                                    type = "poscounts")
+# 4. Correr DESeq2
+ds_condicion <- DESeq(ds_condicion, 
+                      test = "Wald", 
+                      fitType = "parametric")
+# 5. Extraer resultados
+res_condicion <- results(ds_condicion,
+                         contrast = c("condicion", "domesticada", "silvestre"),
+                         alpha = 0.05)
+# Ver resumen
+summary(res_condicion)
+
+# Para la comparación por SEXO (hembra vs macho)
+ds_sexo <- phyloseq_to_deseq2(s16_familia, ~ sexo)
+# 3. Estimar factores de tamaño con conteos cero
+ds_sexo <- estimateSizeFactors(ds_sexo, 
+                                    type = "poscounts")
+# 4. Correr DESeq2
+ds_sexo <- DESeq(ds_sexo, 
+                      test = "Wald", 
+                      fitType = "parametric")
+# 5. Extraer resultados
+res_sexo <- results(ds_sexo,
+                         contrast = c("sexo", "hembra", "macho"),
+                         alpha = 0.05)
+# Ver resumen
+summary(res_sexo)
+# Ver qué familia es significativa en sexo
+res_sexo_df <- as.data.frame(res_sexo) %>%
+  rownames_to_column("ASV") %>%
+  filter(!is.na(padj), padj < 0.05) %>%
+  arrange(desc(log2FoldChange))
+
+tax_tabla_fam <- as.data.frame(tax_table(s16_familia)) %>%
+  rownames_to_column("ASV")
+
+res_sexo_df <- left_join(res_sexo_df, tax_tabla_fam, by = "ASV")
+
+res_sexo_df %>% dplyr::select(Family, log2FoldChange, padj)
+
+# Comparación por tratamiento (efecto más fuerte en PERMANOVA)
+s16_familia <- tax_glom(s16_6, taxrank = "Family")
+
+ds_tratamiento <- phyloseq_to_deseq2(s16_familia, ~ tratamiento)
+ds_tratamiento <- estimateSizeFactors(ds_tratamiento, type = "poscounts")
+ds_tratamiento <- DESeq(ds_tratamiento, test = "Wald", fitType = "parametric")
+
+res_tratamiento <- results(ds_tratamiento,
+                           contrast = c("tratamiento", "t2", "t1"),
+                           alpha = 0.05)
+summary(res_tratamiento)
+
+# Extraer resultados como dataframe
+res_trat_df <- as.data.frame(res_tratamiento) %>%
+  rownames_to_column("ASV") %>%
+  filter(!is.na(padj), padj < 0.05) %>%
+  arrange(desc(log2FoldChange))
+
+# Agregar taxonomía
+tax_tabla <- as.data.frame(tax_table(s16_familia)) %>%
+  rownames_to_column("ASV")
+
+res_trat_df <- left_join(res_trat_df, tax_tabla, by = "ASV")
+
+# Ver qué familias son
+res_trat_df %>% dplyr::select(Family, log2FoldChange, padj)
+
+# Graficando
+ggplot(res_trat_df, aes(x = reorder(Family, log2FoldChange), 
+                        y = log2FoldChange)) +
+  geom_col(fill = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  labs(x = "Family", 
+       y = "log2 Fold Change (visited vs. unvisited)",
+       title = "Differentially abundant bacterial families by treatment") +
+  theme_bw()
+
+### VOLCANO PLOT
+library(ggplot2)
+library(ggrepel)  # para etiquetas que no se sobrepongan
+
+# Preparar dataframe completo (incluyendo no significativos)
+res_trat_volcano <- as.data.frame(res_tratamiento) %>%
+  rownames_to_column("ASV") %>%
+  filter(!is.na(padj)) %>%
+  left_join(tax_tabla_fam, by = "ASV") %>%
+  mutate(
+    significativo = case_when(
+      padj < 0.05 & log2FoldChange > 0 ~ "More abundant in visited",
+      padj < 0.05 & log2FoldChange < 0 ~ "More abundant in unvisited",
+      TRUE ~ "Not significant"
+    )
+  )
+
+# Volcano plot
+ggplot(res_trat_volcano, aes(x = log2FoldChange, 
+                             y = -log10(padj),
+                             color = significativo,
+                             label = Family)) +
+  geom_point(size = 3, alpha = 0.8) +
+  geom_hline(yintercept = -log10(0.05), 
+             linetype = "dashed", color = "gray40") +
+  geom_vline(xintercept = 0, 
+             linetype = "dashed", color = "gray40") +
+  geom_text_repel(data = filter(res_trat_volcano, padj < 0.05),
+                  size = 3.5,
+                  fontface = "italic",
+                  max.overlaps = 20) +
+  scale_color_manual(values = c(
+    "More abundant in visited"   = "steelblue",
+    "More abundant in unvisited" = "tomato",
+    "Not significant"            = "gray70"
+  )) +
+  labs(x = "log2 Fold Change (visited vs. unvisited)",
+       y = "-log10 (adjusted p-value)",
+       color = NULL) +
+  theme_bw() +
+  theme(legend.position = "top",
+        panel.grid.minor = element_blank())
+
+##############################################################################
+###  differential abundance (DA) analysis of microbial taxa with ANCOMBC2 
+#devtools::install_github("FrederickHuangLin/ANCOMBC")
+citation("ANCOMBC")
+library(ANCOMBC)
+library(ggplot2)
+
+# CONDICION
+ancom_con_16s <- ancombc2(
+  data = s16_6,
+  tax_level = "Family",
+  fix_formula = "condicion",
+  p_adj_method = "BH",
+  alpha = 0.05,
+  prv_cut = 0.10
+)
+
+# Ver resultados significativos
+res_con_16s <- ancom_con_16s$res
+res_con_16s_sig <- res_con_16s[res_con_16s$diff_condicionsilvestre == TRUE, 
+                                 c("taxon", "lfc_condicionsilvestre", 
+                                   "q_condicionsilvestre")]
+print(res_con_16s_sig)
+
+# Gráfica de Barras por condicion
+# Preparar datos
+res_con_16s_plot <- res_con_16s_sig %>%
+  mutate(
+    direccion = ifelse(lfc_condicionsilvestre > 0, 
+                       "More abundant in domesticated", 
+                       "More abundant in wild"),
+    taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
+  )
+
+# Grafica
+ggplot(res_con_16s_plot, 
+       aes(x = reorder(taxon, lfc_condicionsilvestre),
+           y = lfc_condicionsilvestre,
+           fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Family",
+       y = "log2 Fold Change (Domesticated vs. Wild)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
+
+# SEXO FLORAL
+ancom_sex_16s <- ancombc2(
+  data = s16_6,
+  tax_level = "Family",
+  fix_formula = "sexo",
+  p_adj_method = "BH",
+  alpha = 0.05,
+  prv_cut = 0.10
+)
+
+# Ver resultados significativos
+res_sex_16s <- ancom_sex_16s$res
+res_sex_16s_sig <- res_sex_16s[res_sex_16s$diff_sexomacho == TRUE, 
+                               c("taxon", "lfc_sexomacho", 
+                                 "q_sexomacho")]
+print(res_sex_16s_sig)
+
+# Gráfica de Barras por sexo
+# Preparar datos
+res_sex_16s_plot <- res_sex_16s_sig %>%
+  mutate(
+    direccion = ifelse(lfc_sexomacho > 0, 
+                       "More abundant in staminate", 
+                       "More abundant in pistillate"),
+    taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
+  )
+
+# Grafica
+ggplot(res_sex_16s_plot, 
+       aes(x = reorder(taxon, lfc_sexomacho),
+           y = lfc_sexomacho,
+           fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Family",
+       y = "log2 Fold Change (Staminate vs. Pistillate)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
+
+
+# Tratamiento
+ancom_trat_16s <- ancombc2(
+  data = s16_6,
+  tax_level = "Family",
+  fix_formula = "tratamiento",
+  p_adj_method = "BH",
+  alpha = 0.05,
+  prv_cut = 0.10
+)
+
+# Ver resultados significativos
+res_trat_16s <- ancom_trat_16s$res
+res_trat_16s_sig <- res_trat_16s[res_trat_16s$diff_tratamientot2 == TRUE, 
+                                 c("taxon", "lfc_tratamientot2", 
+                                   "q_tratamientot2")]
+print(res_trat_16s_sig)
+
+# Gráfica de Barras de tratamiento
+# Preparar datos
+res_trat_16s_plot <- res_trat_16s_sig %>%
+  mutate(
+    direccion = ifelse(lfc_tratamientot2 > 0, 
+                       "More abundant in visited", 
+                       "More abundant in unvisited"),
+    taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
+  )
+
+# Grafica
+ggplot(res_trat_16s_plot, 
+       aes(x = reorder(taxon, lfc_tratamientot2),
+           y = lfc_tratamientot2,
+           fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Family",
+       y = "log2 Fold Change (visited vs. unvisited)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
 
 ###############################################################################
 ### Código para Top 10 Familias Global (Sin Agrupar por Variables)
@@ -4310,6 +4701,16 @@ sd2 = azu2 %>%
                    sac_sd = sd(sacarosa),
                    tot_sd = sd(Suma.total))
 sd2
+
+
+### 
+boxplot(azu2$Suma.total ~ azu2$condicion)
+boxplot(azu2$Suma.total ~ azu2$sexo)
+boxplot(azu2$Suma.total ~ azu2$trat)
+
+boxplot(azu2$Suma.total ~ azu2$condicion + azu2$trat)
+
+
 
 library(dplyr)
 resultado <- left_join(media2, sd2, by = c("condicion", "sexo", "trat"))

@@ -4434,6 +4434,11 @@ library (bipartite)
 # CAA: 22:50:56
 # CM: 13:18:00
 
+30+23+13
+7.5+31.5
+66+39
+
+
 #To calculate the visitation rate for each floral visitor group we divided the
 # number of visits by the total duration of the video recording 
 # (decimal time = time x 1440) for each flower.
@@ -4673,17 +4678,45 @@ head(azu2)
 
 tapply(azu2$Suma.total, list(azu2$condicion, azu2$sexo, azu2$trat), length)
 
+tapply(azu2$Suma.total, list(azu2$spp, azu2$sexo, azu2$trat), length)
+tapply(azu2$Suma.total, list(azu2$spp, azu2$trat), length)
+tapply(azu2$Suma.total, azu2$trat, length)
+
+# Pruebas de normalidad de cada azucar
 shapiro.test(azu2$fructosa)
 shapiro.test(azu2$glucosa)
 shapiro.test(azu2$sacarosa)
 shapiro.test(azu2$Suma.total)
 
-
+### Histogramas de cada azucar
+hist(azu2$fructosa)
+hist(azu2$glucosa)
+hist(azu2$sacarosa)
 hist(azu2$Suma.total)
 
+azu2$fructosa
+azu2$glucosa
 
-mod1 = aov(azu2$Suma.total ~ azu2$condicion * azu2$sexo * azu2$trat)
+# Modelo 1: análisis de varianza de Concentración de Sacarosa
+mod1 = glm(fructosa ~ condicion * sexo * trat, 
+           data = azu2, family = Gamma(link = "log"))
 summary(mod1)
+library(car)
+Anova(mod1)
+
+# Modelo 2: análisis de varianza de Concentración de Sacarosa
+mod2 = glm(glucosa ~ condicion * sexo * trat, 
+           data = azu2, family = Gamma(link = "log"))
+summary(mod2)
+Anova(mod1)
+
+# Modelo 3: análisis de varianza de Concentración de Sacarosa
+mod3 = aov(azu2$sacarosa ~ azu2$condicion * azu2$sexo * azu2$trat)
+summary(mod3)
+
+# Modelo 4: análisis de varianza de Concentración total
+mod4 = aov(azu2$Suma.total ~ azu2$condicion * azu2$sexo * azu2$trat)
+summary(mod4)
 
 TukeyHSD(mod1)
 

@@ -1234,56 +1234,6 @@ ggplot(df_long, aes(x = comp_condicion, y = valor,
        y     = "Distancia de Jaccard",
        fill  = "Comparación de tratamiento")
 
-
-###############################################################################
-###############################################################################
-# install microViz
-#remotes::install_github("david-barnett/microViz")
-library("microViz")
-library(phyloseq)
-library(ggplot2)
-library(patchwork) # for arranging groups of plots
-
-
-# Paquete microbiome
-# 16S
-# Paquete microbiome
-transform <- microbiome::transform
-s16_prop <- transform(s16_6, "compositional")
-otu_table(s16_prop)[1:10, 1:10]
-head(sample_sums(s16_prop))
-
-s16_prop %>%
-  tax_fix(unknowns = c("Incertae Sedis")) %>%
-  comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
-  coord_flip() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-
-# modificada
-s16_prop %>%
-  tax_fix(unknowns = c("Incertae Sedis")) %>%
-  comp_barplot(tax_level = "Family", n_taxa = 15)+
-  facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
-  coord_flip() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-
-
-# ITS (fungi)
-transform <- microbiome::transform
-ps_prop <- transform(s16_6, "compositional")
-otu_table(ps_prop)[1:10, 1:10]
-head(sample_sums(ps_prop))
-
-ps_prop %>%
-  tax_fix() %>%
-  comp_barplot(tax_level = "Genus", n_taxa = 15, facet_by = "tratamiento",
-               group_by = "")+
-  coord_flip() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-
-#facet_grid(labeller = labeller(tratamiento = trata))
-
-###############################################################################
 ###############################################################################
 ##############################################################################
 ###  differential abundance (DA) analysis of microbial taxa with ANCOMBC2 
@@ -1305,8 +1255,8 @@ ancom_con_16s <- ancombc2(
 # Ver resultados significativos
 res_con_16s <- ancom_con_16s$res
 res_con_16s_sig <- res_con_16s[res_con_16s$diff_condicionsilvestre == TRUE, 
-                                 c("taxon", "lfc_condicionsilvestre", 
-                                   "q_condicionsilvestre")]
+                               c("taxon", "lfc_condicionsilvestre", 
+                                 "q_condicionsilvestre")]
 print(res_con_16s_sig)
 
 # Gráfica de Barras por condicion
@@ -1314,8 +1264,8 @@ print(res_con_16s_sig)
 res_con_16s_plot <- res_con_16s_sig %>%
   mutate(
     direccion = ifelse(lfc_condicionsilvestre > 0, 
-                       "More abundant in domesticated", 
-                       "More abundant in wild"),
+                       "More abundant in wild", 
+                       "More abundant in domesticated"),
     taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
   )
 
@@ -1405,7 +1355,7 @@ res_trat_16s_plot <- res_trat_16s_sig %>%
   )
 
 # Grafica
-ggplot(res_trat_16s_plot, 
+ancom_16s_trat = ggplot(res_trat_16s_plot, 
        aes(x = reorder(taxon, lfc_tratamientot2),
            y = lfc_tratamientot2,
            fill = direccion)) +
@@ -1419,6 +1369,57 @@ ggplot(res_trat_16s_plot,
   theme_bw() +
   theme(legend.position = "top")
 
+
+ancom_16s_trat
+###############################################################################
+###############################################################################
+# install microViz
+#remotes::install_github("david-barnett/microViz")
+library("microViz")
+library(phyloseq)
+library(ggplot2)
+library(patchwork) # for arranging groups of plots
+
+
+# Paquete microbiome
+# 16S
+# Paquete microbiome
+transform <- microbiome::transform
+s16_prop <- transform(s16_6, "compositional")
+otu_table(s16_prop)[1:10, 1:10]
+head(sample_sums(s16_prop))
+
+s16_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+# modificada
+s16_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+
+# ITS (fungi)
+transform <- microbiome::transform
+ps_prop <- transform(s16_6, "compositional")
+otu_table(ps_prop)[1:10, 1:10]
+head(sample_sums(ps_prop))
+
+ps_prop %>%
+  tax_fix() %>%
+  comp_barplot(tax_level = "Genus", n_taxa = 15, facet_by = "tratamiento",
+               group_by = "")+
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+#facet_grid(labeller = labeller(tratamiento = trata))
+
+###############################################################################
 ###############################################################################
 ### Código para Top 10 Familias Global (Sin Agrupar por Variables)
 # A. Aglomerar a nivel de Familia
@@ -4498,7 +4499,7 @@ str(volumen2)
 #### Análisis de nectar entre tratamientos ####
 setwd("/home/luis/Documentos/3_Doctorado_UNAM/a-proyecto/analisis_florales_tesis_2022/datos_completos/")
 
-azu = read.csv("azucares_2022.csv", header = T)
+azu = read.csv("azucares_2022.csv", header = T, fileEncoding = "latin1")
 head(azu)
 str(azu)
 azu2 =subset(azu, sitio == "morelia")
@@ -4525,28 +4526,28 @@ hist(azu2$Suma.total)
 azu2$fructosa
 azu2$glucosa
 
-# Modelo 1: análisis de varianza de Concentración de Sacarosa
-mod1 = glm(fructosa ~ condicion * sexo * trat, 
+# Modelo 1: análisis de varianza de Concentración de fructosa
+mod1 = glm(fructosa ~ condicion * sexo * tratamiento, 
            data = azu2, family = Gamma(link = "log"))
 summary(mod1)
 library(car)
 Anova(mod1)
 
 # Modelo 2: análisis de varianza de Concentración de Sacarosa
-mod2 = glm(glucosa ~ condicion * sexo * trat, 
+mod2 = glm(glucosa ~ condicion * sexo * tratamiento, 
            data = azu2, family = Gamma(link = "log"))
 summary(mod2)
 Anova(mod1)
 
 # Modelo 3: análisis de varianza de Concentración de Sacarosa
-mod3 = aov(azu2$sacarosa ~ azu2$condicion * azu2$sexo * azu2$trat)
+mod3 = aov(azu2$sacarosa ~ azu2$condicion * azu2$sexo * azu2$tratamiento)
 summary(mod3)
 
 # Modelo 4: análisis de varianza de Concentración total
 mod4 = aov(azu2$Suma.total ~ azu2$condicion * azu2$sexo * azu2$trat)
 summary(mod4)
 
-TukeyHSD(mod1)
+TukeyHSD(mod4)
 
 # media
 media2 = azu2 %>%
@@ -4572,7 +4573,340 @@ boxplot(azu2$Suma.total ~ azu2$trat)
 boxplot(azu2$Suma.total ~ azu2$condicion + azu2$trat)
 
 
+str(azu2)
+head(azu2)
+sort(azu2$id_planta)
+sort(azu2$sexo)
 
+str(hill_wide_ic)
+head(hill_wide_ic)
+sort(hill_wide_ic$sexo)
+sort(hill_wide_ic$año)
+tapply(hill_wide_ic$qD_q0, hill_wide_ic$año, length)
+
+### Paso 1: Verificar los IDs de cada tabla
+# Ver IDs únicos en cada tabla
+sort(unique(azu2$id_planta))
+sort(unique(hill_wide_ic$id_planta))
+
+# Ver cuántos coinciden
+ids_azu  <- unique(tolower(azu2$id_planta))         # convertir a minúsculas
+ids_hill <- unique(tolower(hill_wide_ic$id_planta))  # convertir a minúsculas
+
+# IDs que están en azu2 pero NO en hill
+setdiff(ids_azu, ids_hill)
+
+# IDs que están en hill pero NO en azu2
+setdiff(ids_hill, ids_azu)
+
+# IDs que coinciden en ambas
+intersect(ids_azu, ids_hill)
+
+### Paso 2: Estandarizar la capitalización antes de unir
+library(dplyr)
+
+# Convertir id_planta a minúsculas en ambas tablas
+azu2 <- azu2 %>%
+  mutate(año = as.character(año),
+         id_planta = tolower(id_planta))
+
+hill_wide_ic <- hill_wide_ic %>%
+  mutate(id_planta = tolower(id_planta))
+
+### Paso 3: Elegir el tipo de join según tu objetivo
+# Inner join: solo conserva filas que coinciden en ambas tablas
+datos_unidos <- hill_wide_ic %>%
+  inner_join(azu2 %>%
+               dplyr::select(año, id_planta, sexo, tratamiento, fructosa, glucosa,
+                             sacarosa, Suma.total),
+             by = c("año","id_planta","sexo", "tratamiento"))
+
+# Verificar cuántas filas quedaron
+dim(datos_unidos)
+datos_unidos
+View(datos_unidos)
+
+str(hill_wide_ic_its)
+str(azu2)
+hill_wide_ic_its$clave
+azu2$clave
+# datos de hongos
+datos_unidos_its <- hill_wide_ic_its %>%
+  inner_join(azu2 %>%
+               dplyr::select(clave, sexo, tratamiento, fructosa, glucosa,
+                             sacarosa, Suma.total),
+             by = c("clave","sexo", "tratamiento"))
+
+# Verificar cuántas filas quedaron
+dim(datos_unidos_its)
+datos_unidos_its
+
+
+
+
+
+
+# left_join
+datos_unidos_left <- hill_wide_ic %>%
+  left_join(azu2 %>% 
+              dplyr::select(año, id_planta, sexo, tratamiento, fructosa, glucosa, 
+                            sacarosa, Suma.total),
+            by = c("año","id_planta", "sexo", "tratamiento"))
+View(datos_unidos_left)
+
+# Ver cuántos NAs quedan por columna
+colSums(is.na(datos_unidos_left))
+
+# Ver cuántas filas completas tienes
+sum(complete.cases(datos_unidos_left))
+
+# Ver cuántas filas tienen NA en azúcares
+sum(is.na(datos_unidos_left$fructosa))
+
+# Correlaciones (na.rm automático)
+fruc1 = cor.test(datos_unidos_left$qD_q1, datos_unidos_left$fructosa,
+                 method = "spearman", use    = "complete.obs")
+
+fruc1
+
+# Ver cuántas muestras hay por grupo
+table(datos_unidos$condicion)
+table(datos_unidos$tratamiento)
+table(datos_unidos$sexo)
+
+# Ver cuántas muestras por año
+table(datos_unidos$año)
+
+# Ver combinaciones
+table(datos_unidos$condicion,datos_unidos$sexo, datos_unidos$tratamiento)
+table(datos_unidos$condicion, datos_unidos$sexo)
+
+boxplot(datos_unidos$qD_q2 ~ datos_unidos$condicion)
+boxplot(datos_unidos$qD_q2 ~ datos_unidos$sexo)
+boxplot(datos_unidos$qD_q2 ~ datos_unidos$tratamiento)
+
+
+boxplot(datos_unidos$fructosa ~ datos_unidos$condicion)
+boxplot(datos_unidos$fructosa ~ datos_unidos$sexo)
+boxplot(datos_unidos$fructosa ~ datos_unidos$tratamiento)
+
+
+boxplot(datos_unidos$glucosa ~ datos_unidos$condicion)
+boxplot(datos_unidos$glucosa ~ datos_unidos$sexo)
+boxplot(datos_unidos$glucosa ~ datos_unidos$tratamiento)
+
+boxplot(datos_unidos$sacarosa ~ datos_unidos$condicion)
+boxplot(datos_unidos$sacarosa ~ datos_unidos$sexo)
+boxplot(datos_unidos$sacarosa ~ datos_unidos$tratamiento)
+
+boxplot(datos_unidos$Suma.total ~ datos_unidos$condicion)
+boxplot(datos_unidos$Suma.total ~ datos_unidos$sexo)
+boxplot(datos_unidos$Suma.total ~ datos_unidos$tratamiento)
+
+
+cor_fru_q0 <- cor.test(datos_unidos$qD_q0, datos_unidos$fructosa, method = "spearman")
+cor_fru_q1 <- cor.test(datos_unidos$qD_q1, datos_unidos$fructosa, method = "spearman")
+cor_fru_q2 <- cor.test(datos_unidos$qD_q2, datos_unidos$fructosa, method = "spearman")
+
+cor_glu_q0 <- cor.test(datos_unidos$qD_q0, datos_unidos$glucosa, method = "spearman")
+cor_glu_q1 <- cor.test(datos_unidos$qD_q1, datos_unidos$glucosa, method = "spearman")
+cor_glu_q2 <- cor.test(datos_unidos$qD_q2, datos_unidos$glucosa, method = "spearman")
+
+cor_sac_q0 <- cor.test(datos_unidos$qD_q0, datos_unidos$sacarosa, method = "spearman")
+cor_sac_q1 <- cor.test(datos_unidos$qD_q1, datos_unidos$sacarosa, method = "spearman")
+cor_sac_q2 <- cor.test(datos_unidos$qD_q2, datos_unidos$sacarosa, method = "spearman")
+
+cor_tot_q0 <- cor.test(datos_unidos$qD_q0, datos_unidos$Suma.total, method = "spearman")
+cor_tot_q1 <- cor.test(datos_unidos$qD_q1, datos_unidos$Suma.total, method = "spearman")
+cor_tot_q2 <- cor.test(datos_unidos$qD_q2, datos_unidos$Suma.total, method = "spearman")
+
+# Resumir todos en una tabla
+tabla_cor <- data.frame(
+  Azucar     = rep(c("Fructosa", "Glucosa", "Sacarosa", "Suma.total"), each = 3),
+  Hill_q     = rep(c("q0", "q1", "q2"), times = 4),
+  rho        = c(cor_fru_q0$estimate, cor_fru_q1$estimate, cor_fru_q2$estimate,
+                 cor_glu_q0$estimate, cor_glu_q1$estimate, cor_glu_q2$estimate,
+                 cor_sac_q0$estimate, cor_sac_q1$estimate, cor_sac_q2$estimate,
+                 cor_tot_q0$estimate, cor_tot_q1$estimate, cor_tot_q2$estimate),
+  p_valor    = c(cor_fru_q0$p.value, cor_fru_q1$p.value, cor_fru_q2$p.value,
+                 cor_glu_q0$p.value, cor_glu_q1$p.value, cor_glu_q2$p.value,
+                 cor_sac_q0$p.value, cor_sac_q1$p.value, cor_sac_q2$p.value,
+                 cor_tot_q0$p.value, cor_tot_q1$p.value, cor_tot_q2$p.value)
+)
+
+
+tabla_cor$significancia <- ifelse(tabla_cor$p_valor <= 0.001, "***",
+                                  ifelse(tabla_cor$p_valor <= 0.01,  "**",
+                                         ifelse(tabla_cor$p_valor <= 0.05,  "*",
+                                                ifelse(tabla_cor$p_valor <= 0.10,  ".", "ns"))))
+
+print(tabla_cor)
+
+
+mod_azu1 = glm(qD_q0 ~ fructosa + glucosa + sacarosa +
+                 condicion * sexo * tratamiento,
+               data = datos_unidos,
+               family = poisson(link = "log"))
+summary(mod_azu1)
+Anova(mod_azu1)
+
+# Calcular ratio de dispersión (debe ser ~1 si no hay sobredispersión)
+E2 <- resid(mod_azu1, type = "pearson")
+sum(E2^2) / df.residual(mod_azu1)
+# Modelo con q0 binomial negativo
+library(MASS)
+# q0 modelo fructosa
+modnb_azu1 <- glm.nb(qD_q0 ~ fructosa +
+                       tratamiento,
+                     data = datos_unidos,
+                   link = "log")
+summary(modnb_azu1)
+Anova(modnb_azu1)
+# q0 con glucosa
+modnb_azu1 <- glm.nb(qD_q0 ~ glucosa +
+                       tratamiento,
+                     data = datos_unidos,
+                     link = "log")
+summary(modnb_azu1)
+Anova(modnb_azu1)
+# q0 con sacarosa
+modnb_azu1 <- glm.nb(qD_q0 ~ sacarosa +
+                       tratamiento,
+                     data = datos_unidos,
+                     link = "log")
+summary(modnb_azu1)
+Anova(modnb_azu1)
+# q0 con concentración total
+modnb_azu1 <- glm.nb(qD_q0 ~ Suma.total +
+                       tratamiento,
+                     data = datos_unidos,
+                     link = "log")
+summary(modnb_azu1)
+Anova(modnb_azu1)
+
+
+
+
+
+
+
+### Test de Mantel
+library(vegan)
+library(phyloseq)
+
+# Filtrar el objeto phyloseq a las 53 muestras
+muestras_53 <- datos_unidos$sampleid2
+ps_53 <- prune_samples(muestras_53, ps_con_arbol)
+
+# Recalcular beta diversidad
+asv_53    <- t(as.data.frame(otu_table(ps_53)))
+dist_bray_53 <- vegdist(asv_53, method = "bray")
+
+# Matriz de distancias de azúcares
+dist_azucares <- dist(datos_unidos[, c("fructosa", "glucosa", "sacarosa",
+                                       "Suma.total")],
+                      method = "euclidean")
+
+# Mantel test
+set.seed(123)
+mantel(dist_bray_53, dist_azucares,
+       method       = "spearman",
+       permutations = 999)
+
+####
+library(vegan)
+
+# Matriz de ASVs de las 53 muestras
+asv_53 <- t(as.data.frame(otu_table(ps_53)))
+
+# Variables ambientales (azúcares)
+azucares <- datos_unidos %>%
+  dplyr::select(fructosa, glucosa, sacarosa)
+
+# dbRDA con Bray-Curtis
+dbrda_bac <- dbrda(asv_53 ~ fructosa + glucosa + sacarosa,
+                   data   = azucares,
+                   method = "bray")
+
+# Prueba de significancia global
+set.seed(123)
+anova(dbrda_bac, permutations = 999)
+
+# Prueba por cada variable
+anova(dbrda_bac, by = "terms", permutations = 999)
+
+# Varianza explicada
+RsquareAdj(dbrda_bac)
+
+
+### NMDS
+library(vegan)
+
+# Matriz de ASVs de las 53 muestras completas
+asv_53 <- t(as.data.frame(otu_table(ps_53)))
+#asvs <- t(as.data.frame(otu_table(s16_6)))
+
+# NMDS
+set.seed(123)
+nmds <- metaMDS(asv_53,
+                distance = "bray",
+                k        = 2,       # 2 dimensiones
+                trymax   = 100)     # intentos para converger
+
+# Verificar el stress (debe ser < 0.2)
+nmds$stress
+
+# Variables ambientales (azúcares)
+azucares <- datos_unidos %>%
+  dplyr::select(fructosa, glucosa, sacarosa, Suma.total)
+
+# envfit: correlación de azúcares con el NMDS
+set.seed(123)
+ef <- envfit(nmds, azucares,
+             permutations = 999,
+             na.rm        = TRUE)
+
+# Ver resultados
+print(ef)
+
+# Graficar todas las flechas aunque no sean significativas
+# pero indicando cuáles son significativas
+ef_coords <- ef_coords %>%
+  mutate(sig = ifelse(pval < 0.05, "p < 0.05", "p > 0.05"))
+
+ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2)) +
+  geom_point(aes(color = condicion, shape = tratamiento),
+             size = 3, alpha = 0.8) +
+  stat_ellipse(aes(color = condicion, group = condicion),
+               linewidth = 0.7) +
+  geom_segment(data = ef_coords,
+               aes(x = 0, y = 0,
+                   xend = NMDS1 * 0.3,
+                   yend = NMDS2 * 0.3,
+                   linetype = sig),
+               arrow     = arrow(length = unit(0.3, "cm")),
+               color     = "black",
+               linewidth = 0.7) +
+  geom_text(data = ef_coords,
+            aes(x     = NMDS1 * 0.35,
+                y     = NMDS2 * 0.35,
+                label = paste0(variable, "\n(r²=",
+                               round(r2, 3), ", p=",
+                               round(pval, 3), ")")),
+            size = 3, fontface = "italic") +
+  scale_color_manual(values   = c("domesticada" = "#C0392B",
+                                  "silvestre"   = "#2980B9")) +
+  scale_shape_manual(values   = c("t1" = 16, "t2" = 17)) +
+  scale_linetype_manual(values = c("p < 0.05" = "solid",
+                                   "p > 0.05" = "dashed")) +
+  theme_bw(base_size = 13) +
+  labs(title    = paste0("NMDS Bray-Curtis (stress = ",
+                         round(nmds$stress, 3), ")"),
+       color    = "Condición",
+       shape    = "Tratamiento",
+       linetype = "Significancia")
+
+###############################################################################
 library(dplyr)
 resultado <- left_join(media2, sd2, by = c("condicion", "sexo", "trat"))
 resultado

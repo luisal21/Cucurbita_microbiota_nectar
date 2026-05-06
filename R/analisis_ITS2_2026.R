@@ -1093,9 +1093,6 @@ ggplot(df_long, aes(x = comp_condicion, y = valor,
        fill  = "Comparación de tratamiento")
 
 
-
-
-
 ###############################################################################
 ###  differential abundance (DA) analysis of microbial taxa 
 #devtools::install_github("FrederickHuangLin/ANCOMBC")
@@ -1118,6 +1115,30 @@ res_cond_its_sig <- res_cond_its[res_cond_its$diff_condicionsilvestre == TRUE |
                                  c("taxon", "lfc_condicionsilvestre",
                                    "q_condicionsilvestre")]
 print(res_cond_its_sig)
+# Gráfica de Barras por condicion
+# Preparar datos
+res_con_its_plot <- res_cond_its_sig %>%
+  mutate(
+    direccion = ifelse(lfc_condicionsilvestre > 0, 
+                       "More abundant in wild", 
+                       "More abundant in domesticated"),
+    taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
+  )
+
+# Grafica
+ggplot(res_con_its_plot, 
+       aes(x = reorder(taxon, lfc_condicionsilvestre),
+           y = lfc_condicionsilvestre,
+           fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Family",
+       y = "log2 Fold Change (Domesticated vs. Wild)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
 
 # Sexo
 ancom_sexo_its <- ancombc2(
@@ -1135,10 +1156,35 @@ res_sexo_its_sig <- res_sexo_its[res_sexo_its$diff_sexomacho == TRUE |
                                  c("taxon", "lfc_sexomacho",
                                    "q_sexomacho")]
 print(res_sexo_its_sig)
+# Gráfica de Barras por sexo
+# Preparar datos
+res_sex_its_plot <- res_sexo_its_sig %>%
+  mutate(
+    direccion = ifelse(lfc_sexomacho > 0, 
+                       "More abundant in staminate", 
+                       "More abundant in pistillate"),
+    taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
+  )
+
+# Grafica
+ggplot(res_sex_its_plot, 
+       aes(x = reorder(taxon, lfc_sexomacho),
+           y = lfc_sexomacho,
+           fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Family",
+       y = "log2 Fold Change (Staminate vs. Pistillate)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
+
 # Tratamiento
 ancom_trat_its <- ancombc2(
   data = its6,
-  tax_level = "Genus",
+  tax_level = "Family",
   fix_formula = "tratamiento",
   p_adj_method = "BH",
   alpha = 0.05,
@@ -1151,8 +1197,36 @@ res_trat_its_sig <- res_trat_its[res_trat_its$diff_tratamientot2 == TRUE,
                                  c("taxon", "lfc_tratamientot2", 
                                    "q_tratamientot2")]
 print(res_trat_its_sig)
+# Gráfica de Barras de tratamiento
+# Preparar datos
+res_trat_its_plot <- res_trat_its_sig %>%
+  mutate(
+    direccion = ifelse(lfc_tratamientot2 > 0, 
+                       "More abundant in visited", 
+                       "More abundant in unvisited"),
+    taxon = gsub("f__", "", taxon)  # limpiar prefijo f__
+  )
 
+# Grafica
+ancom_its_trat = ggplot(res_trat_its_plot, 
+                        aes(x = reorder(taxon, lfc_tratamientot2),
+                            y = lfc_tratamientot2,
+                            fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Family",
+       y = "log2 Fold Change (visited vs. unvisited)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
 
+ancom_16s_trat
+ancom_its_trat
+DA = ggarrange(ancom_16s_trat, ancom_its_trat,
+               nrow = 1, labels = "AUTO")
+DA
 ############################################################################
 ###############################################################################
 ### Código para Top 10 Familias Global (Sin Agrupar por Variables)

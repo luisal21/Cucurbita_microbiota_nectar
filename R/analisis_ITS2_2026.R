@@ -907,40 +907,27 @@ beta = ggarrange(pcoa_16s, pcoa_its,
                  common.legend = TRUE, legend = "bottom")
 
 beta
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
-#wei_16s
-#+ coord_fixed()
-
-#+ stat_ellipse(type = "t")
-#baseplot_16s_hem_wei + stat_ellipse(type = "t")
-
-
 
 ######################### Bray-Curtis y Sørensen en R #########################
 library(vegan)
 
 # Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
-asv_matrix <- t(as.data.frame(otu_table(ps_con_arbol)))
+asv_matrix_its <- t(as.data.frame(otu_table(ps_con_arbol_its)))
 
 # Bray-Curtis (basada en abundancias)
-dist_bray <- vegdist(asv_matrix, method = "bray")
+dist_bray_its <- vegdist(asv_matrix_its, method = "bray")
 
 # Sørensen (basada en presencia/ausencia)
-dist_sorensen <- vegdist(asv_matrix, method = "bray", binary = TRUE)
+dist_sorensen_its <- vegdist(asv_matrix_its, method = "bray", binary = TRUE)
 # binary = TRUE convierte a presencia/ausencia antes de calcular
 
 # PERMANOVA para probar diferencias entre grupos
-metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
+metadata_its3 <- as.data.frame(as.matrix(sample_data(ps_con_arbol_its)))
 
 # Con Bray-Curtis
 set.seed(1)
-adonis2(dist_bray ~ condicion * sexo * tratamiento,
-        data         = metadata,
+adonis2(dist_bray_its ~ condicion * sexo * tratamiento,
+        data         = metadata_its3,
         permutations = 999, by = "terms")
 
 # Con Sørensen

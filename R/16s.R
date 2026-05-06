@@ -254,38 +254,12 @@ data.frame(
 
 #install.packages("iNEXT")       # rarefacción y extrapolación
 #install.packages("hillR")       # Hill a partir de phyloseq
-
-library(hillR)
-library(phyloseq)
-
-# Extraer tabla de OTU/ASV (muestras en filas)
-asv_table <- as.data.frame(t(otu_table(s16_6)))
-
-# Calcular Hill para cada q
-hill_q0 <- hill_taxa(asv_table, q = 0)  # riqueza
-hill_q1 <- hill_taxa(asv_table, q = 1)  # Shannon
-hill_q2 <- hill_taxa(asv_table, q = 2)  # Simpson
-
-# Unir con metadatos
-hill_df <- data.frame(
-  sample_id  = names(hill_q0),
-  q0         = hill_q0,
-  q1         = hill_q1,
-  q2         = hill_q2
-)
-
-# Agregar variables del experimento
-meta <- as.data.frame(sample_data(s16_6))
-hill_df <- merge(hill_df, meta, by = "row.names")
-View(hill_df)
-
-
-
-
+#library(hillR)
 
 ###   CURVAS DE RAREFACCIÓN
 ### POR CONDICIÓN
 library(iNEXT)
+library(phyloseq)
 
 # Extraer tabla de ASVs y metadatos del objeto phyloseq
 asv_table <- as.data.frame(otu_table(s16_6))# ASVs en filas, muestras en columnas
@@ -346,6 +320,7 @@ coverage_incidence
 unique(coverage_incidence$SC)
 View(coverage_incidence)
 
+head(metadata)
 # Uniendo tabla de estimateD con metadatos
 library(dplyr)
 library(tidyr)
@@ -361,6 +336,8 @@ hill_wide_ic <- coverage_incidence %>%
 # Verificando
 colnames(hill_wide_ic)
 head(hill_wide_ic)
+View(hill_wide_ic)
+write.csv(hill_wide_ic, file = "Hillnumbers_16s.csv")
 
 # Paso 1: histogramas de Hill numbers
 hist(hill_wide_ic$qD_q0)
@@ -422,6 +399,32 @@ tapply(hill_wide_ic$qD_q2, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
 tapply(hill_wide_ic$qD_q2, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
                         hill_wide_ic$tratamiento), sd)
 
+### Gráfica de Hill numbers: q0
+nombres_condicion <- c("domesticada" = "Domesticated",
+                       "silvestre"   = "Wild")
+
+nombres_sexo <- c("hembra" = "Pistillate",
+                  "macho"  = "Staminate")
+# plot
+bacterias_hill = ggplot(hill_wide_ic, aes(y = qD_q0, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  facet_grid(sexo ~ condicion,
+             labeller = labeller(
+               condicion = nombres_condicion,
+               sexo = nombres_sexo
+             ))+
+  labs(x = "Treatment",
+       y = "Richness")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                    labels = c("t1" = "Unvisited",
+                               "t2" = "Visited"),
+                    palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
+  
+bacterias_hill
 
 # Gráfica de curvas de cobertura de muestra
 # Ver qué tan completo está cada muestra/grupo
@@ -856,8 +859,9 @@ ggplot(hill_valores, aes(x = Assemblage, y = qD)) +
                              "Sil-Macho-t2" = "WSV"))
 
 ###############################################################################
+###############################################################################
 ################ BETA DIVERSITY OF BACTERIA
-BiocManager::install("DECIPHER")
+#BiocManager::install("DECIPHER")
 
 # Cargando paquetes
 library(DECIPHER)
@@ -892,23 +896,31 @@ writeXStringSet(alineamiento,
 # 7. Verificar que se guardó
 file.exists("alineamiento_its2.fasta")
 
-library(ape)
 
-##### Importar árbol ####
+
+####################### Importar árbol ##########################
+library(ape)
+library(phangorn)
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
+
+# Cargando arbol
 arbol_ft <- read.tree("arbol_its2.nwk")
 
 # Verificar
 arbol_ft
-plot(arbol_ft, cex = 0.2)  # grafica rápida para verificar
+#plot(arbol_ft, cex = 0.2)  # grafica rápida para verificar
+# Enraizando arbol
+arbol_ft_root = midpoint(arbol_ft)
+is.rooted(arbol_ft_root)
 
 # Incorporar a phyloseq
-ps_con_arbol <- merge_phyloseq(s16_6, phy_tree(arbol_ft))
+ps_con_arbol <- merge_phyloseq(s16_6, phy_tree(arbol_ft_root))
 
 # Verificar que quedó bien
 ps_con_arbol
 phy_tree(ps_con_arbol)
 
-# UniFrac no ponderado
+######### UniFrac no ponderado #########
 unifrac_nw <- UniFrac(ps_con_arbol, weighted = FALSE, normalized = TRUE)
 
 # UniFrac ponderado
@@ -982,7 +994,9 @@ baseplot_16s_wei <- plot_ordination(ps_con_arbol,
 
 #baseplot_16s_wei
 #baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
-baseplot_16s_wei + stat_ellipse(linetype = 2)
+baseplot_16s_wei
+pcoa_16s = baseplot_16s_wei + stat_ellipse(linetype = 2)
+pcoa_16s
 #
 #baseplot2 +
 #  geom_point(size = 1) +

@@ -1,7 +1,5 @@
 ############ ASIGNACIÓN TAXONÓMICA CON BASE UNITE ALL COMPLETA ################
 #### Analysis post-taxonomic assignation
-### change directory
-setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
 
 # Cargando paquete phyloseq y paquetes adicionales
 library(phyloseq); packageVersion("phyloseq")
@@ -24,6 +22,9 @@ library(reshape2)
 #library(minpack.lm) # no instalado
 library(Hmisc)
 library(stats4)
+
+### change directory
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
 
 # cargar primero el archivo de metadatos
 meta_its <- read.csv("its_metadata_2024.csv", header = T)
@@ -152,92 +153,13 @@ data.frame(
 #install.packages("iNEXT")       # rarefacción y extrapolación
 #install.packages("hillR")       # Hill a partir de phyloseq
 
-library(hillR)
-library(phyloseq)
-
-# Extraer tabla de OTU/ASV (muestras en filas)
-asv_table <- as.data.frame(t(otu_table(its6)))
-
-# Calcular Hill para cada q
-hill_q0 <- hill_taxa(asv_table, q = 0)  # riqueza
-hill_q1 <- hill_taxa(asv_table, q = 1)  # Shannon
-hill_q2 <- hill_taxa(asv_table, q = 2)  # Simpson
-
-# Unir con metadatos
-hill_df <- data.frame(
-  sample_id  = names(hill_q0),
-  q0         = hill_q0,
-  q1         = hill_q1,
-  q2         = hill_q2
-)
-
-View(hill_df)
-
-# Agregar variables del experimento
-meta <- as.data.frame(sample_data(its6))
-hill_df <- merge(hill_df, meta, by = "row.names")
-View(hill_df)
-
-hist(hill_df$q0)
-hist(hill_df$q1)
-hist(hill_df$q2)
-
-# Paso 2: Análisis estadístico con tus variables
-# Para cada orden de Hill
-mod_q0 <- glm(q0 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              family = poisson())
-summary(mod_q0)
-# Calcular ratio de dispersión (debe ser ~1 si no hay sobredispersión)
-E2 <- resid(mod_q0, type = "pearson")
-sum(E2^2) / df.residual(mod_q0)
-
-library(MASS)
-# q0 modelo bueno
-mod_q0 <- glm.nb(q0 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              link = "log")
-summary(mod_q0)
-
-#q1
-mod_q1 <- glm(q1 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              family = Gamma(link = "log"))
-
-summary(mod_q1)
-
-# q2
-mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
-              data = hill_df,
-              family = Gamma(link = "log"))
-summary(mod_q2)
-
-
-# ANOVA tipo II
-library(car)
-Anova(mod_q0)
-Anova(mod_q1)
-Anova(mod_q2)
-
-# Summary
-#q1
-tapply(hill_df$q1, list(hill_df$condicion,hill_df$sexo,
-                        hill_df$tratamiento), mean)
-tapply(hill_df$q1, list(hill_df$condicion,hill_df$sexo,
-                        hill_df$tratamiento), sd)
-#q2
-tapply(hill_df$q2, list(hill_df$condicion,hill_df$sexo,
-                        hill_df$tratamiento), mean)
-tapply(hill_df$q2, list(hill_df$condicion,hill_df$sexo,
-                        hill_df$tratamiento), sd)
-
 ###   CURVAS DE RAREFACCIÓN
 ### POR CONDICIÓN
 library(iNEXT)
 
 # Extraer tabla de ASVs y metadatos del objeto phyloseq
-asv_table <- as.data.frame(otu_table(its6))# ASVs en filas, muestras en columnas
-metadata <- as.data.frame(as.matrix(sample_data(its6)))
+asv_table_its <- as.data.frame(otu_table(its6))# ASVs en filas, muestras en columnas
+metadata_its <- as.data.frame(as.matrix(sample_data(its6)))
 
 # Ver los niveles de condición
 unique(metadata$condicion)
@@ -283,24 +205,126 @@ coverage_incidence_con <- estimateD(asv_por_condicion,
                                     conf = 0.95, nboot = 100)
 coverage_incidence_con
 
-coverage_incidence <- estimateD(asv_table,
+### Estimando Hill number por cobertura
+coverage_incidence_its <- estimateD(asv_table_its,
                                     q = c(0, 1, 2),
                                     datatype = "abundance",
                                     base = "coverage",
                                     conf = 0.95, nboot = 100)
-coverage_incidence
+coverage_incidence_its
+unique(coverage_incidence_its$SC)
+View(coverage_incidence_its)
 warnings()
-# Unir con metadatos
-hill_df2 <- data.frame(
-  sample_id  = names(hill_q0),
-  q0         = hill_q0,
-  q1         = hill_q1,
-  q2         = hill_q2
-)
 
-View(hill_df2)
+# Uniendo tablas
+hill_wide_ic_its <- coverage_incidence_its %>%
+  filter(Method == "Observed") %>%
+  dplyr::select(Assemblage, Order.q, qD, qD.LCL, qD.UCL) %>%
+  pivot_wider(names_from  = Order.q,
+              values_from = c(qD, qD.LCL, qD.UCL),
+              names_sep   = "_q") %>%    # genera qD_q0, qD.LCL_q0, etc.
+  rename(sample.id2 = Assemblage) %>%
+  left_join(metadata_its, by = "sample.id2")
+# Verificando
+colnames(hill_wide_ic_its)
+head(hill_wide_ic_its)
+View(hill_wide_ic_its)
+write.csv(hill_wide_ic_its, file = "Hillnumbers_its2.csv")
+
+# Paso 1: histogramas de Hill numbers
+hist(hill_wide_ic_its$qD_q0)
+hist(hill_wide_ic_its$qD_q1)
+hist(hill_wide_ic_its$qD_q2)
+
+shapiro.test(hill_wide_ic_its$qD_q0)
+shapiro.test(hill_wide_ic_its$qD_q1)
+shapiro.test(hill_wide_ic_its$qD_q2)
+
+# Paso 2: Análisis estadístico con tus variables
+# Para cada orden de Hill
+# Modelo con q0
+mod_its_q0 <- glm(qD_q0 ~ condicion * sexo * tratamiento, 
+              data = hill_wide_ic_its,
+              family = poisson())
+summary(mod_its_q0)
+# Calcular ratio de dispersión (debe ser ~1 si no hay sobredispersión)
+E2 <- resid(mod_its_q0, type = "pearson")
+sum(E2^2) / df.residual(mod_its_q0)
+# Modelo con q0 binomial negativo
+library(MASS)
+# q0 modelo bueno
+modnb_its_q0 <- glm.nb(qD_q0 ~ condicion * sexo * tratamiento, 
+                   data = hill_wide_ic_its,
+                   link = "log")
+summary(modnb_its_q0)
+# Modelo con q1
+mod__its_q1 <- glm(qD_q1 ~ condicion * sexo * tratamiento, 
+              data = hill_wide_ic_its,
+              family = Gamma(link = "log"))
+summary(mod__its_q1)
+# Modelo con q2
+mod_its_q2 <- glm(qD_q2 ~ condicion * sexo * tratamiento, 
+              data = hill_wide_ic_its,
+              family = Gamma(link = "log"))
+summary(mod_its_q2)
+
+# ANOVA tipo II
+library(car)
+Anova(modnb_its_q0)
+Anova(mod__its_q1)
+Anova(mod_its_q2)
+
+# Summary
+#q0
+tapply(hill_wide_ic_its$qD_q0, list(hill_wide_ic_its$condicion,hill_wide_ic_its$sexo,
+                                hill_wide_ic_its$tratamiento), mean)
+tapply(hill_wide_ic_its$qD_q0, list(hill_wide_ic_its$condicion,hill_wide_ic_its$sexo,
+                                hill_wide_ic_its$tratamiento), sd)
+#q1
+tapply(hill_wide_ic_its$qD_q1, list(hill_wide_ic_its$condicion,hill_wide_ic_its$sexo,
+                                hill_wide_ic_its$tratamiento), mean)
+tapply(hill_wide_ic_its$qD_q1, list(hill_wide_ic_its$condicion,hill_wide_ic_its$sexo,
+                                hill_wide_ic_its$tratamiento), sd)
+#q2
+tapply(hill_wide_ic_its$qD_q2, list(hill_wide_ic_its$condicion,hill_wide_ic_its$sexo,
+                                hill_wide_ic_its$tratamiento), mean)
+tapply(hill_wide_ic_its$qD_q2, list(hill_wide_ic_its$condicion,hill_wide_ic_its$sexo,
+                                hill_wide_ic_its$tratamiento), sd)
+
+### Gráfica de Hill numbers: q0
+nombres_condicion <- c("domesticada" = "Domesticated",
+                       "silvestre"   = "Wild")
+
+nombres_sexo <- c("hembra" = "Pistillate",
+                  "macho"  = "Staminate")
+# plot
+hongos_hill = ggplot(hill_wide_ic_its, aes(y = qD_q0, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  facet_grid(sexo ~ condicion,
+             labeller = labeller(
+               condicion = nombres_condicion,
+               sexo = nombres_sexo
+             ))+
+  labs(x = "Treatment",
+       y = "Richness")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
 
 
+# Unir las gráficas de bacterias y hongos
+# cargando paqueteria gridExtra
+library(gridExtra)
+library(cowplot)
+
+Hill = ggarrange(bacterias_hill, hongos_hill,
+                  nrow = 2, labels = "AUTO")
+Hill
 
 
 
@@ -739,6 +763,400 @@ scale_x_discrete(labels= c("Dom-Hembra-t1" = "DPU",
 
 ###############################################################################
 ###############################################################################
+###############################################################################
+###############################################################################
+################ BETA DIVERSITY OF BACTERIA
+#BiocManager::install("DECIPHER")
+
+# Cargando paquetes
+library(DECIPHER)
+library(phangorn)
+library(Biostrings)
+
+
+ntaxa(its6)
+
+# 1. extraer directo de los rownames
+seqs <- rownames(otu_table(its6))
+
+# 2. Verificar que son secuencias y no IDs
+head(seqs)  # deben verse como "ATCGGCTA..." 
+nchar(seqs[1])  # debe tener longitud de ~250 pb para ITS2
+
+# 3. Convertir a DNAStringSet y nombrar
+seqs_dna <- DNAStringSet(seqs)
+names(seqs_dna) <- seqs
+
+# 4. Verificar
+class(seqs_dna)
+length(seqs_dna)  # debe coincidir con número de ASVs
+
+# 5. Ahora sí correr el alineamiento
+alineamiento <- AlignSeqs(seqs_dna)
+
+# 6. Guardar el alineamiento en formato FASTA
+writeXStringSet(alineamiento, 
+                filepath = "alineamiento_its2.fasta")
+
+# 7. Verificar que se guardó
+file.exists("alineamiento_its2.fasta")
+
+
+########################### Importar árbol ############################
+library(ape)
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
+arbol_ft_its <- read.tree("arbol_fasttree.nwk")
+
+# Verificar
+arbol_ft_its
+plot(arbol_ft_its, cex = 0.2)  # grafica rápida para verificar
+
+
+# Enraizando arbol
+arbol_ft_its_root = midpoint(arbol_ft_its)
+is.rooted(arbol_ft_its_root)
+
+# Incorporar a phyloseq
+ps_con_arbol_its <- merge_phyloseq(its6, phy_tree(arbol_ft_its_root))
+
+# Verificar que quedó bien
+ps_con_arbol_its
+phy_tree(ps_con_arbol_its)
+
+# UniFrac no ponderado
+unifrac_nw_its <- UniFrac(ps_con_arbol_its, weighted = FALSE, normalized = TRUE)
+
+# UniFrac ponderado
+unifrac_w_its  <- UniFrac(ps_con_arbol_its, weighted = TRUE, normalized = TRUE)
+
+# PERMANOVA y gráficas para UniFrac
+library(vegan)
+
+metadata_its2 <- as.data.frame(as.matrix(sample_data(ps_con_arbol_its)))
+
+# UniFrac no ponderado
+set.seed(1)
+adonis2(unifrac_nw_its ~ condicion * sexo * tratamiento,
+        data         = metadata_its2,
+        permutations = 999, by = "terms")
+
+# UniFrac ponderado
+set.seed(1)
+adonis2(unifrac_w_its ~ condicion * sexo * tratamiento,
+        data         = metadata_its2,
+        permutations = 999, by = "terms")
+
+### Verificar homogeneidad de dispersión
+# UniFrac no ponderado
+disp_nw1_its <- betadisper(unifrac_nw_its, metadata_its2$sexo)
+permutest(disp_nw1_its, permutations = 999)
+
+disp_nw2_its <- betadisper(unifrac_nw_its, metadata_its2$tratamiento)
+permutest(disp_nw2_its, permutations = 999)
+
+# UniFrac ponderado
+disp_w1_its <- betadisper(unifrac_w_its, metadata_its2$sexo)
+permutest(disp_w1_its, permutations = 999)
+
+disp_w2_its <- betadisper(unifrac_w_its, metadata_its2$tratamiento)
+permutest(disp_w2_its, permutations = 999)
+
+
+### Gráficas PCoA
+#### Weighted UniFrac GLOBAL####
+# PCoA plot using the weighted UniFrac as distance
+ordination_wei_its = ordinate(ps_con_arbol_its,
+                              method="PCoA", "wunifrac")
+# Plot
+baseplot_wei_its <- plot_ordination(ps_con_arbol_its, 
+                                    ordination_wei_its,
+                                    color="tratamiento",
+                                    #shape = "sexo",
+                                    type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Treatment",
+                       labels = c("t1" = "Unvisited",
+                                  "t2" = "Visited"),
+                       palette = c("#E6AB02","#4D9221"))
+#scale_color_discrete(name = "Species", 
+#                    labels = c("2CPF" = "CPF","3CAS" = "CAS",
+#                              "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+#        palette = "Set1")+
+#scale_shape_discrete(name = "Condition",
+#                    labels = c("domesticada" = "Domesticated",
+#                              "silvestre" = "Wild"))
+#scale_shape_manual(values=c(16,3))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+#baseplot_16s_wei
+#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
+baseplot_wei_its
+pcoa_its = baseplot_wei_its + stat_ellipse(linetype = 2)
+
+
+# Uniendo plots de PCoA
+beta = ggarrange(pcoa_16s, pcoa_its,
+                 nrow = 1, labels = "AUTO",
+                 common.legend = TRUE, legend = "bottom")
+
+beta
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
+#wei_16s
+#+ coord_fixed()
+
+#+ stat_ellipse(type = "t")
+#baseplot_16s_hem_wei + stat_ellipse(type = "t")
+
+
+
+######################### Bray-Curtis y Sørensen en R #########################
+library(vegan)
+
+# Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
+asv_matrix <- t(as.data.frame(otu_table(ps_con_arbol)))
+
+# Bray-Curtis (basada en abundancias)
+dist_bray <- vegdist(asv_matrix, method = "bray")
+
+# Sørensen (basada en presencia/ausencia)
+dist_sorensen <- vegdist(asv_matrix, method = "bray", binary = TRUE)
+# binary = TRUE convierte a presencia/ausencia antes de calcular
+
+# PERMANOVA para probar diferencias entre grupos
+metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
+
+# Con Bray-Curtis
+set.seed(1)
+adonis2(dist_bray ~ condicion * sexo * tratamiento,
+        data         = metadata,
+        permutations = 999, by = "terms")
+
+# Con Sørensen
+set.seed(1)
+adonis2(dist_sorensen ~ condicion * sexo * tratamiento,
+        data         = metadata,
+        permutations = 999, by = "terms")
+
+
+# Bray-Curtis BETADISPER
+disp_bray1 <- betadisper(dist_bray, metadata$condicion)
+permutest(disp_bray1, permutations = 999)
+
+disp_bray2 <- betadisper(dist_bray, metadata$sexo)
+permutest(disp_bray2, permutations = 999)
+
+disp_bray3 <- betadisper(dist_bray, metadata$tratamiento)
+permutest(disp_bray3, permutations = 999)
+
+# Sørensen
+disp_sor1 <- betadisper(dist_sorensen, metadata$condicion)
+permutest(disp_sor1, permutations = 999)
+
+disp_sor2 <- betadisper(dist_sorensen, metadata$sexo)
+permutest(disp_sor2, permutations = 999)
+
+disp_sor3 <- betadisper(dist_sorensen, metadata$tratamiento)
+permutest(disp_sor3, permutations = 999)
+
+
+# Función para graficar PCoA
+graficar_pcoa <- function(dist_matrix, titulo){
+  
+  pcoa <- cmdscale(dist_matrix, eig = TRUE, k = 2)
+  
+  df_pcoa <- data.frame(
+    PC1       = pcoa$points[, 1],
+    PC2       = pcoa$points[, 2],
+    condicion  = metadata$condicion,
+    sexo       = metadata$sexo,
+    tratamiento = metadata$tratamiento
+  )
+  
+  # Varianza explicada
+  var_exp <- round(pcoa$eig / sum(pcoa$eig[pcoa$eig > 0]) * 100, 1)
+  
+  ggplot(df_pcoa, aes(x = PC1, y = PC2,
+                      color = condicion,
+                      shape = tratamiento)) +
+    geom_point(size = 3, alpha = 0.7) +
+    stat_ellipse(aes(group = tratamiento,
+                     color = tratamiento),
+                 linewidth = 0.7) +
+    theme_bw(base_size = 13) +
+    labs(title = titulo,
+         x = paste0("PC1 (", var_exp[1], "%)"),
+         y = paste0("PC2 (", var_exp[2], "%)"),
+         color = "Condición",
+         shape = "Tratamiento")
+}
+
+# Graficar ambas
+graficar_pcoa(dist_bray,     "PCoA - Bray-Curtis")
+graficar_pcoa(dist_sorensen, "PCoA - Sørensen")
+
+#
+p_bc  <- graficar_pcoa(dist_bray,      "Bray-Curtis")
+p_sor <- graficar_pcoa(dist_sorensen,  "Sørensen")
+p_nw  <- graficar_pcoa_unifrac(unifrac_nw, "UniFrac no ponderado")
+p_w   <- graficar_pcoa_unifrac(unifrac_w,  "UniFrac ponderado")
+
+(p_bc + p_sor) / (p_nw + p_w) +
+  plot_annotation(title = "Diversidad beta - Microbiota de néctar",
+                  theme = theme(plot.title = element_text(face = "bold",
+                                                          size = 14)))
+
+
+# Beta total = Recambio (turnover) + Anidamiento (nestedness)
+
+#Recambio   → comunidades con especies completamente diferentes
+#Anidamiento → una comunidad es subconjunto de otra
+
+# En R con el paquete betapart
+install.packages('rcdd')
+install.packages("betapart")
+
+library(betapart)
+
+
+# Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
+comunidades <- t(as.data.frame(otu_table(ps)))
+
+# Verificar dimensiones
+dim(asv_matrix)  # debe ser: número de muestras × número de ASVs
+head(rownames(asv_matrix))  # nombres de muestras
+head(colnames(asv_matrix))  # nombres de ASVs
+
+# Convertir a presencia/ausencia (0 y 1)
+comunidades <- ifelse(asv_matrix > 0, 1, 0)
+
+beta_total <- beta.pair(comunidades, index.family = "jaccard")
+beta_total$beta.jtu   # recambio (turnover)
+beta_total$beta.jne   # anidamiento (nestedness)
+beta_total$beta.jac   # beta total
+
+
+# Con abundancias usar bray en lugar de jaccard
+beta_bray <- beta.pair.abund(asv_matrix, index.family = "bray")
+
+beta_bray$beta.bray.bal   # recambio (balancedness)
+beta_bray$beta.bray.gra   # anidamiento (gradient)
+beta_bray$beta.bray       # beta total
+
+boxplot(beta_bray$beta.bray.bal)
+boxplot(beta_bray$beta.bray.gra)
+boxplot(beta_bray$beta.bray)
+
+### Gráficar
+# Correr betapart (presencia/ausencia)
+beta_total <- beta.pair(comunidades, index.family = "jaccard")
+
+# Convertir cada matriz de distancia a data.frame
+turnover   <- as.matrix(beta_total$beta.jtu)
+nestedness <- as.matrix(beta_total$beta.jne)
+beta_jac   <- as.matrix(beta_total$beta.jac)
+
+# Convertir a formato largo
+mat_to_long <- function(mat, nombre) {
+  as.data.frame(mat) %>%
+    mutate(sample1 = rownames(.)) %>%
+    pivot_longer(-sample1, names_to = "sample2", values_to = nombre) %>%
+    filter(sample1 != sample2)  # quitar diagonal
+}
+
+df_turn <- mat_to_long(turnover,   "turnover")
+df_nest <- mat_to_long(nestedness, "nestedness")
+df_jac  <- mat_to_long(beta_jac,   "beta_total")
+
+# Unir los tres componentes
+df_beta <- df_turn %>%
+  left_join(df_nest, by = c("sample1", "sample2")) %>%
+  left_join(df_jac,  by = c("sample1", "sample2"))
+
+head(df_beta)
+
+# Agregar metadatos
+metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
+
+# Agregar metadatos de sample1
+df_beta <- df_beta %>%
+  left_join(metadata %>% 
+              mutate(sample1 = rownames(.)) %>%
+              select(sample1, 
+                     condicion1   = condicion,
+                     sexo1        = sexo,
+                     tratamiento1 = tratamiento),
+            by = "sample1") %>%
+  # Agregar metadatos de sample2
+  left_join(metadata %>%
+              mutate(sample2 = rownames(.)) %>%
+              select(sample2,
+                     condicion2   = condicion,
+                     sexo2        = sexo,
+                     tratamiento2 = tratamiento),
+            by = "sample2") %>%
+  # Crear columna de comparación entre grupos
+  mutate(
+    comp_condicion   = paste(pmin(condicion1,   condicion2),
+                             pmax(condicion1,   condicion2),   sep = " vs "),
+    comp_sexo        = paste(pmin(sexo1,        sexo2),
+                             pmax(sexo1,        sexo2),        sep = " vs "),
+    comp_tratamiento = paste(pmin(tratamiento1, tratamiento2),
+                             pmax(tratamiento1, tratamiento2), sep = " vs ")
+  )
+
+# Convertir a formato largo para graficar turnover y nestedness juntos
+df_long <- df_beta %>%
+  pivot_longer(cols      = c(turnover, nestedness),
+               names_to  = "componente",
+               values_to = "valor") %>%
+  mutate(componente = factor(componente,
+                             levels = c("turnover", "nestedness"),
+                             labels = c("Recambio (turnover)",
+                                        "Anidamiento (nestedness)")))
+
+View(df_long)
+###
+# Crear grupo combinado de comparación
+df_long <- df_long %>%
+  mutate(grupo = paste0(comp_condicion, "\n",
+                        comp_sexo, "\n",
+                        comp_tratamiento))
+
+ggplot(df_long, aes(x = comp_condicion, y = valor,
+                    fill = comp_tratamiento)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.5,
+               position = position_dodge(width = 0.8)) +
+  scale_fill_manual(values = c("t1 vs t1" = "#E74C3C",
+                               "t1 vs t2" = "#E67E22",
+                               "t2 vs t2" = "#27AE60")) +
+  facet_grid(componente ~ comp_sexo, scales = "free_y") +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x     = element_text(angle = 45, hjust = 1),
+        strip.background = element_rect(fill = "grey90"),
+        strip.text       = element_text(face = "bold"),
+        legend.position  = "bottom") +
+  labs(title = "Recambio y anidamiento por condición × sexo × tratamiento",
+       x     = "Condición",
+       y     = "Distancia de Jaccard",
+       fill  = "Comparación de tratamiento")
+
+
+
+
+
+###############################################################################
 ###  differential abundance (DA) analysis of microbial taxa 
 #devtools::install_github("FrederickHuangLin/ANCOMBC")
 ### ANALISIS CON ANCOM-BC2
@@ -1003,379 +1421,4 @@ cat("Suma total:", sum(df_final_global$Percentage), "%\n")
 
 View(df_final_global)
 write.csv(df_final_global, "abundancias_top10_global.csv")
-
-###############################################################################
-###############################################################################
-###############################################################################
-################ BETA DIVERSITY OF BACTERIA
-BiocManager::install("DECIPHER")
-
-# Cargando paquetes
-library(DECIPHER)
-library(phangorn)
-library(Biostrings)
-
-
-ntaxa(its6)
-
-# 1. extraer directo de los rownames
-seqs <- rownames(otu_table(its6))
-
-# 2. Verificar que son secuencias y no IDs
-head(seqs)  # deben verse como "ATCGGCTA..." 
-nchar(seqs[1])  # debe tener longitud de ~250 pb para ITS2
-
-# 3. Convertir a DNAStringSet y nombrar
-seqs_dna <- DNAStringSet(seqs)
-names(seqs_dna) <- seqs
-
-# 4. Verificar
-class(seqs_dna)
-length(seqs_dna)  # debe coincidir con número de ASVs
-
-# 5. Ahora sí correr el alineamiento
-alineamiento <- AlignSeqs(seqs_dna)
-
-# 6. Guardar el alineamiento en formato FASTA
-writeXStringSet(alineamiento, 
-                filepath = "alineamiento_its2.fasta")
-
-# 7. Verificar que se guardó
-file.exists("alineamiento_its2.fasta")
-
-
-##### Importar árbol ####
-library(ape)
-arbol_ft <- read.tree("arbol_fasttree.nwk")
-
-# Verificar
-arbol_ft
-plot(arbol_ft, cex = 0.2)  # grafica rápida para verificar
-
-# Incorporar a phyloseq
-ps_con_arbol <- merge_phyloseq(its6, phy_tree(arbol_ft))
-
-# Verificar que quedó bien
-ps_con_arbol
-phy_tree(ps_con_arbol)
-
-# UniFrac no ponderado
-unifrac_nw <- UniFrac(ps_con_arbol, weighted = FALSE, normalized = TRUE)
-
-# UniFrac ponderado
-unifrac_w  <- UniFrac(ps_con_arbol, weighted = TRUE, normalized = TRUE)
-
-# PERMANOVA y gráficas para UniFrac
-library(vegan)
-
-metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
-
-# UniFrac no ponderado
-set.seed(1)
-adonis2(unifrac_nw ~ condicion * sexo * tratamiento,
-        data         = metadata,
-        permutations = 999, by = "terms")
-
-# UniFrac ponderado
-set.seed(1)
-adonis2(unifrac_w ~ condicion * sexo * tratamiento,
-        data         = metadata,
-        permutations = 999, by = "terms")
-
-### Verificar homogeneidad de dispersión
-# UniFrac no ponderado
-disp_nw1 <- betadisper(unifrac_nw, metadata$sexo)
-permutest(disp_nw1, permutations = 999)
-
-disp_nw2 <- betadisper(unifrac_nw, metadata$tratamiento)
-permutest(disp_nw2, permutations = 999)
-
-# UniFrac ponderado
-disp_w1 <- betadisper(unifrac_w, metadata$sexo)
-permutest(disp_w1, permutations = 999)
-
-disp_w2 <- betadisper(unifrac_w, metadata$tratamiento)
-permutest(disp_w2, permutations = 999)
-
-
-### Gráficas PCoA
-#### Weighted UniFrac GLOBAL####
-# PCoA plot using the weighted UniFrac as distance
-ordination_16s_wei = ordinate(ps_con_arbol,
-                              method="PCoA", "wunifrac")
-# Plot
-baseplot_16s_wei <- plot_ordination(ps_con_arbol, 
-                                    ordination_16s_wei,
-                                    color="tratamiento",
-                                    shape = "sexo",
-                                    type = "samples") + #shape = "sexo" shape = "tratamiento"
-  ggtitle("")+
-  theme(aspect.ratio=1)+
-  theme_bw()+
-  geom_point(size = 4)+
-  scale_color_discrete(name = "Treatment",
-                       labels = c("t1" = "Unvisited",
-                                  "t2" = "Visited"),
-                       palette = c("#E6AB02","#4D9221"))
-#scale_color_discrete(name = "Species", 
-#                    labels = c("2CPF" = "CPF","3CAS" = "CAS",
-#                              "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
-#        palette = "Set1")+
-#scale_shape_discrete(name = "Condition",
-#                    labels = c("domesticada" = "Domesticated",
-#                              "silvestre" = "Wild"))
-#scale_shape_manual(values=c(16,3))
-#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
-#scale_color_discrete(name = "Condition", 
-#                    labels = c("Domesticated","Wild"))+
-#scale_color_discrete(name = "Treatment",
-#                     labels = c("No-visited","Visited"))
-
-#baseplot_16s_wei
-#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
-baseplot_16s_wei + stat_ellipse(linetype = 2)
-#
-#baseplot2 +
-#  geom_point(size = 1) +
-#  geom_label(aes(label = clave), size = 3.5, color = "black")
-#
-#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
-#wei_16s
-#+ coord_fixed()
-
-#+ stat_ellipse(type = "t")
-#baseplot_16s_hem_wei + stat_ellipse(type = "t")
-
-
-
-######################### Bray-Curtis y Sørensen en R #########################
-library(vegan)
-
-# Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
-asv_matrix <- t(as.data.frame(otu_table(ps_con_arbol)))
-
-# Bray-Curtis (basada en abundancias)
-dist_bray <- vegdist(asv_matrix, method = "bray")
-
-# Sørensen (basada en presencia/ausencia)
-dist_sorensen <- vegdist(asv_matrix, method = "bray", binary = TRUE)
-# binary = TRUE convierte a presencia/ausencia antes de calcular
-
-# PERMANOVA para probar diferencias entre grupos
-metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
-
-# Con Bray-Curtis
-set.seed(1)
-adonis2(dist_bray ~ condicion * sexo * tratamiento,
-        data         = metadata,
-        permutations = 999, by = "terms")
-
-# Con Sørensen
-set.seed(1)
-adonis2(dist_sorensen ~ condicion * sexo * tratamiento,
-        data         = metadata,
-        permutations = 999, by = "terms")
-
-
-# Bray-Curtis BETADISPER
-disp_bray1 <- betadisper(dist_bray, metadata$condicion)
-permutest(disp_bray1, permutations = 999)
-
-disp_bray2 <- betadisper(dist_bray, metadata$sexo)
-permutest(disp_bray2, permutations = 999)
-
-disp_bray3 <- betadisper(dist_bray, metadata$tratamiento)
-permutest(disp_bray3, permutations = 999)
-
-# Sørensen
-disp_sor1 <- betadisper(dist_sorensen, metadata$condicion)
-permutest(disp_sor1, permutations = 999)
-
-disp_sor2 <- betadisper(dist_sorensen, metadata$sexo)
-permutest(disp_sor2, permutations = 999)
-
-disp_sor3 <- betadisper(dist_sorensen, metadata$tratamiento)
-permutest(disp_sor3, permutations = 999)
-
-
-# Función para graficar PCoA
-graficar_pcoa <- function(dist_matrix, titulo){
-  
-  pcoa <- cmdscale(dist_matrix, eig = TRUE, k = 2)
-  
-  df_pcoa <- data.frame(
-    PC1       = pcoa$points[, 1],
-    PC2       = pcoa$points[, 2],
-    condicion  = metadata$condicion,
-    sexo       = metadata$sexo,
-    tratamiento = metadata$tratamiento
-  )
-  
-  # Varianza explicada
-  var_exp <- round(pcoa$eig / sum(pcoa$eig[pcoa$eig > 0]) * 100, 1)
-  
-  ggplot(df_pcoa, aes(x = PC1, y = PC2,
-                      color = condicion,
-                      shape = tratamiento)) +
-    geom_point(size = 3, alpha = 0.7) +
-    stat_ellipse(aes(group = tratamiento,
-                     color = tratamiento),
-                 linewidth = 0.7) +
-    theme_bw(base_size = 13) +
-    labs(title = titulo,
-         x = paste0("PC1 (", var_exp[1], "%)"),
-         y = paste0("PC2 (", var_exp[2], "%)"),
-         color = "Condición",
-         shape = "Tratamiento")
-}
-
-# Graficar ambas
-graficar_pcoa(dist_bray,     "PCoA - Bray-Curtis")
-graficar_pcoa(dist_sorensen, "PCoA - Sørensen")
-
-#
-p_bc  <- graficar_pcoa(dist_bray,      "Bray-Curtis")
-p_sor <- graficar_pcoa(dist_sorensen,  "Sørensen")
-p_nw  <- graficar_pcoa_unifrac(unifrac_nw, "UniFrac no ponderado")
-p_w   <- graficar_pcoa_unifrac(unifrac_w,  "UniFrac ponderado")
-
-(p_bc + p_sor) / (p_nw + p_w) +
-  plot_annotation(title = "Diversidad beta - Microbiota de néctar",
-                  theme = theme(plot.title = element_text(face = "bold",
-                                                          size = 14)))
-
-
-# Beta total = Recambio (turnover) + Anidamiento (nestedness)
-
-#Recambio   → comunidades con especies completamente diferentes
-#Anidamiento → una comunidad es subconjunto de otra
-
-# En R con el paquete betapart
-install.packages('rcdd')
-install.packages("betapart")
-
-library(betapart)
-
-
-# Extraer tabla de ASVs (muestras en filas, ASVs en columnas)
-comunidades <- t(as.data.frame(otu_table(ps)))
-
-# Verificar dimensiones
-dim(asv_matrix)  # debe ser: número de muestras × número de ASVs
-head(rownames(asv_matrix))  # nombres de muestras
-head(colnames(asv_matrix))  # nombres de ASVs
-
-# Convertir a presencia/ausencia (0 y 1)
-comunidades <- ifelse(asv_matrix > 0, 1, 0)
-
-beta_total <- beta.pair(comunidades, index.family = "jaccard")
-beta_total$beta.jtu   # recambio (turnover)
-beta_total$beta.jne   # anidamiento (nestedness)
-beta_total$beta.jac   # beta total
-
-
-# Con abundancias usar bray en lugar de jaccard
-beta_bray <- beta.pair.abund(asv_matrix, index.family = "bray")
-
-beta_bray$beta.bray.bal   # recambio (balancedness)
-beta_bray$beta.bray.gra   # anidamiento (gradient)
-beta_bray$beta.bray       # beta total
-
-boxplot(beta_bray$beta.bray.bal)
-boxplot(beta_bray$beta.bray.gra)
-boxplot(beta_bray$beta.bray)
-
-### Gráficar
-# Correr betapart (presencia/ausencia)
-beta_total <- beta.pair(comunidades, index.family = "jaccard")
-
-# Convertir cada matriz de distancia a data.frame
-turnover   <- as.matrix(beta_total$beta.jtu)
-nestedness <- as.matrix(beta_total$beta.jne)
-beta_jac   <- as.matrix(beta_total$beta.jac)
-
-# Convertir a formato largo
-mat_to_long <- function(mat, nombre) {
-  as.data.frame(mat) %>%
-    mutate(sample1 = rownames(.)) %>%
-    pivot_longer(-sample1, names_to = "sample2", values_to = nombre) %>%
-    filter(sample1 != sample2)  # quitar diagonal
-}
-
-df_turn <- mat_to_long(turnover,   "turnover")
-df_nest <- mat_to_long(nestedness, "nestedness")
-df_jac  <- mat_to_long(beta_jac,   "beta_total")
-
-# Unir los tres componentes
-df_beta <- df_turn %>%
-  left_join(df_nest, by = c("sample1", "sample2")) %>%
-  left_join(df_jac,  by = c("sample1", "sample2"))
-
-head(df_beta)
-
-# Agregar metadatos
-metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
-
-# Agregar metadatos de sample1
-df_beta <- df_beta %>%
-  left_join(metadata %>% 
-              mutate(sample1 = rownames(.)) %>%
-              select(sample1, 
-                     condicion1   = condicion,
-                     sexo1        = sexo,
-                     tratamiento1 = tratamiento),
-            by = "sample1") %>%
-  # Agregar metadatos de sample2
-  left_join(metadata %>%
-              mutate(sample2 = rownames(.)) %>%
-              select(sample2,
-                     condicion2   = condicion,
-                     sexo2        = sexo,
-                     tratamiento2 = tratamiento),
-            by = "sample2") %>%
-  # Crear columna de comparación entre grupos
-  mutate(
-    comp_condicion   = paste(pmin(condicion1,   condicion2),
-                             pmax(condicion1,   condicion2),   sep = " vs "),
-    comp_sexo        = paste(pmin(sexo1,        sexo2),
-                             pmax(sexo1,        sexo2),        sep = " vs "),
-    comp_tratamiento = paste(pmin(tratamiento1, tratamiento2),
-                             pmax(tratamiento1, tratamiento2), sep = " vs ")
-  )
-
-# Convertir a formato largo para graficar turnover y nestedness juntos
-df_long <- df_beta %>%
-  pivot_longer(cols      = c(turnover, nestedness),
-               names_to  = "componente",
-               values_to = "valor") %>%
-  mutate(componente = factor(componente,
-                             levels = c("turnover", "nestedness"),
-                             labels = c("Recambio (turnover)",
-                                        "Anidamiento (nestedness)")))
-
-View(df_long)
-###
-# Crear grupo combinado de comparación
-df_long <- df_long %>%
-  mutate(grupo = paste0(comp_condicion, "\n",
-                        comp_sexo, "\n",
-                        comp_tratamiento))
-
-ggplot(df_long, aes(x = comp_condicion, y = valor,
-                    fill = comp_tratamiento)) +
-  geom_boxplot(alpha = 0.7, outlier.size = 0.5,
-               position = position_dodge(width = 0.8)) +
-  scale_fill_manual(values = c("t1 vs t1" = "#E74C3C",
-                               "t1 vs t2" = "#E67E22",
-                               "t2 vs t2" = "#27AE60")) +
-  facet_grid(componente ~ comp_sexo, scales = "free_y") +
-  theme_bw(base_size = 12) +
-  theme(axis.text.x     = element_text(angle = 45, hjust = 1),
-        strip.background = element_rect(fill = "grey90"),
-        strip.text       = element_text(face = "bold"),
-        legend.position  = "bottom") +
-  labs(title = "Recambio y anidamiento por condición × sexo × tratamiento",
-       x     = "Condición",
-       y     = "Distancia de Jaccard",
-       fill  = "Comparación de tratamiento")
 

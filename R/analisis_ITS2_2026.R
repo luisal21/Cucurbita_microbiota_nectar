@@ -932,77 +932,30 @@ adonis2(dist_bray_its ~ condicion * sexo * tratamiento,
 
 # Con Sørensen
 set.seed(1)
-adonis2(dist_sorensen ~ condicion * sexo * tratamiento,
-        data         = metadata,
+adonis2(dist_sorensen_its ~ condicion * sexo * tratamiento,
+        data         = metadata_its3,
         permutations = 999, by = "terms")
 
 
 # Bray-Curtis BETADISPER
-disp_bray1 <- betadisper(dist_bray, metadata$condicion)
-permutest(disp_bray1, permutations = 999)
+disp_bray1_its <- betadisper(dist_bray_its, metadata_its3$condicion)
+permutest(disp_bray1_its, permutations = 999)
 
-disp_bray2 <- betadisper(dist_bray, metadata$sexo)
-permutest(disp_bray2, permutations = 999)
+disp_bray2_its <- betadisper(dist_bray_its, metadata_its3$sexo)
+permutest(disp_bray2_its, permutations = 999)
 
-disp_bray3 <- betadisper(dist_bray, metadata$tratamiento)
-permutest(disp_bray3, permutations = 999)
+disp_bray3_its <- betadisper(dist_bray_its, metadata_its3$tratamiento)
+permutest(disp_bray3_its, permutations = 999)
 
 # Sørensen
-disp_sor1 <- betadisper(dist_sorensen, metadata$condicion)
-permutest(disp_sor1, permutations = 999)
+disp_sor1_its <- betadisper(dist_sorensen_its, metadata_its3$condicion)
+permutest(disp_sor1_its, permutations = 999)
 
-disp_sor2 <- betadisper(dist_sorensen, metadata$sexo)
-permutest(disp_sor2, permutations = 999)
+disp_sor2_its <- betadisper(dist_sorensen_its, metadata_its3$sexo)
+permutest(disp_sor2_its, permutations = 999)
 
-disp_sor3 <- betadisper(dist_sorensen, metadata$tratamiento)
-permutest(disp_sor3, permutations = 999)
-
-
-# Función para graficar PCoA
-graficar_pcoa <- function(dist_matrix, titulo){
-  
-  pcoa <- cmdscale(dist_matrix, eig = TRUE, k = 2)
-  
-  df_pcoa <- data.frame(
-    PC1       = pcoa$points[, 1],
-    PC2       = pcoa$points[, 2],
-    condicion  = metadata$condicion,
-    sexo       = metadata$sexo,
-    tratamiento = metadata$tratamiento
-  )
-  
-  # Varianza explicada
-  var_exp <- round(pcoa$eig / sum(pcoa$eig[pcoa$eig > 0]) * 100, 1)
-  
-  ggplot(df_pcoa, aes(x = PC1, y = PC2,
-                      color = condicion,
-                      shape = tratamiento)) +
-    geom_point(size = 3, alpha = 0.7) +
-    stat_ellipse(aes(group = tratamiento,
-                     color = tratamiento),
-                 linewidth = 0.7) +
-    theme_bw(base_size = 13) +
-    labs(title = titulo,
-         x = paste0("PC1 (", var_exp[1], "%)"),
-         y = paste0("PC2 (", var_exp[2], "%)"),
-         color = "Condición",
-         shape = "Tratamiento")
-}
-
-# Graficar ambas
-graficar_pcoa(dist_bray,     "PCoA - Bray-Curtis")
-graficar_pcoa(dist_sorensen, "PCoA - Sørensen")
-
-#
-p_bc  <- graficar_pcoa(dist_bray,      "Bray-Curtis")
-p_sor <- graficar_pcoa(dist_sorensen,  "Sørensen")
-p_nw  <- graficar_pcoa_unifrac(unifrac_nw, "UniFrac no ponderado")
-p_w   <- graficar_pcoa_unifrac(unifrac_w,  "UniFrac ponderado")
-
-(p_bc + p_sor) / (p_nw + p_w) +
-  plot_annotation(title = "Diversidad beta - Microbiota de néctar",
-                  theme = theme(plot.title = element_text(face = "bold",
-                                                          size = 14)))
+disp_sor3_its <- betadisper(dist_sorensen_its, metadata_its3$tratamiento)
+permutest(disp_sor3_its, permutations = 999)
 
 
 # Beta total = Recambio (turnover) + Anidamiento (nestedness)
@@ -1200,166 +1153,7 @@ res_trat_its_sig <- res_trat_its[res_trat_its$diff_tratamientot2 == TRUE,
 print(res_trat_its_sig)
 
 
-
-
 ############################################################################
-### ANÁLISIS CON DESEQ2
-# Paso 1. Instalar y cargar paquetes
-#if (!requireNamespace("BiocManager", quietly = TRUE))
-# install.packages("BiocManager")
-#BiocManager::install("DESeq2")
-library(DESeq2)
-library(phyloseq)
-
-# 2. Convertir phyloseq a DESeq2
-# primero revisar cuantos NA hay
-sum(is.na(tax_table(its6)[, "Family"]))
-# Eliminar ASVs sin asignación a nivel de Familia y agrupar 
-its_familia <- its6%>%
-  subset_taxa(!is.na(Family)) %>%
-  tax_glom(taxrank = "Family")
-# Para la comparación por condición (domesticated vs wild)
-ds_condicion_its <- phyloseq_to_deseq2(its_familia, ~ condicion)
-
-
-# Método alternativo
-geoMeans <- apply(counts(ds_condicion_its), 1, function(row) {
-  if (all(row == 0)) 0 
-  else exp(mean(log(row[row != 0])))
-})
-
-ds_condicion_its <- estimateSizeFactors(ds_condicion_its, 
-                                      geoMeans = geoMeans)
-        
-
-
-
-# 3. Estimar factores de tamaño con conteos cero
-ds_condicion_its <- estimateSizeFactors(ds_condicion_its, 
-                                    type = "poscounts")
-# 4. Correr DESeq2
-ds_condicion <- DESeq(ds_condicion, 
-                      test = "Wald", 
-                      fitType = "parametric")
-# 5. Extraer resultados
-res_condicion <- results(ds_condicion,
-                         contrast = c("condicion", "domesticada", "silvestre"),
-                         alpha = 0.05)
-# Ver resumen
-summary(res_condicion)
-
-# Para la comparación por SEXO (hembra vs macho)
-ds_sexo <- phyloseq_to_deseq2(s16_familia, ~ sexo)
-# 3. Estimar factores de tamaño con conteos cero
-ds_sexo <- estimateSizeFactors(ds_sexo, 
-                               type = "poscounts")
-# 4. Correr DESeq2
-ds_sexo <- DESeq(ds_sexo, 
-                 test = "Wald", 
-                 fitType = "parametric")
-# 5. Extraer resultados
-res_sexo <- results(ds_sexo,
-                    contrast = c("sexo", "hembra", "macho"),
-                    alpha = 0.05)
-# Ver resumen
-summary(res_sexo)
-# Ver qué familia es significativa en sexo
-res_sexo_df <- as.data.frame(res_sexo) %>%
-  rownames_to_column("ASV") %>%
-  filter(!is.na(padj), padj < 0.05) %>%
-  arrange(desc(log2FoldChange))
-
-tax_tabla_fam <- as.data.frame(tax_table(s16_familia)) %>%
-  rownames_to_column("ASV")
-
-res_sexo_df <- left_join(res_sexo_df, tax_tabla_fam, by = "ASV")
-
-res_sexo_df %>% dplyr::select(Family, log2FoldChange, padj)
-
-# Comparación por tratamiento (efecto más fuerte en PERMANOVA)
-s16_familia <- tax_glom(s16_6, taxrank = "Family")
-
-ds_tratamiento <- phyloseq_to_deseq2(s16_familia, ~ tratamiento)
-ds_tratamiento <- estimateSizeFactors(ds_tratamiento, type = "poscounts")
-ds_tratamiento <- DESeq(ds_tratamiento, test = "Wald", fitType = "parametric")
-
-res_tratamiento <- results(ds_tratamiento,
-                           contrast = c("tratamiento", "t2", "t1"),
-                           alpha = 0.05)
-summary(res_tratamiento)
-
-# Extraer resultados como dataframe
-res_trat_df <- as.data.frame(res_tratamiento) %>%
-  rownames_to_column("ASV") %>%
-  filter(!is.na(padj), padj < 0.05) %>%
-  arrange(desc(log2FoldChange))
-
-# Agregar taxonomía
-tax_tabla <- as.data.frame(tax_table(s16_familia)) %>%
-  rownames_to_column("ASV")
-
-res_trat_df <- left_join(res_trat_df, tax_tabla, by = "ASV")
-
-# Ver qué familias son
-res_trat_df %>% dplyr::select(Family, log2FoldChange, padj)
-
-# Graficando
-ggplot(res_trat_df, aes(x = reorder(Family, log2FoldChange), 
-                        y = log2FoldChange)) +
-  geom_col(fill = "steelblue") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  coord_flip() +
-  labs(x = "Family", 
-       y = "log2 Fold Change (visited vs. unvisited)",
-       title = "Differentially abundant bacterial families by treatment") +
-  theme_bw()
-
-### VOLCANO PLOT
-library(ggplot2)
-library(ggrepel)  # para etiquetas que no se sobrepongan
-
-# Preparar dataframe completo (incluyendo no significativos)
-res_trat_volcano <- as.data.frame(res_tratamiento) %>%
-  rownames_to_column("ASV") %>%
-  filter(!is.na(padj)) %>%
-  left_join(tax_tabla_fam, by = "ASV") %>%
-  mutate(
-    significativo = case_when(
-      padj < 0.05 & log2FoldChange > 0 ~ "More abundant in visited",
-      padj < 0.05 & log2FoldChange < 0 ~ "More abundant in unvisited",
-      TRUE ~ "Not significant"
-    )
-  )
-
-# Volcano plot
-ggplot(res_trat_volcano, aes(x = log2FoldChange, 
-                             y = -log10(padj),
-                             color = significativo,
-                             label = Family)) +
-  geom_point(size = 3, alpha = 0.8) +
-  geom_hline(yintercept = -log10(0.05), 
-             linetype = "dashed", color = "gray40") +
-  geom_vline(xintercept = 0, 
-             linetype = "dashed", color = "gray40") +
-  geom_text_repel(data = filter(res_trat_volcano, padj < 0.05),
-                  size = 3.5,
-                  fontface = "italic",
-                  max.overlaps = 20) +
-  scale_color_manual(values = c(
-    "More abundant in visited"   = "steelblue",
-    "More abundant in unvisited" = "tomato",
-    "Not significant"            = "gray70"
-  )) +
-  labs(x = "log2 Fold Change (visited vs. unvisited)",
-       y = "-log10 (adjusted p-value)",
-       color = NULL) +
-  theme_bw() +
-  theme(legend.position = "top",
-        panel.grid.minor = element_blank())
-
-
-
-
 ###############################################################################
 ### Código para Top 10 Familias Global (Sin Agrupar por Variables)
 # A. Aglomerar a nivel de Familia

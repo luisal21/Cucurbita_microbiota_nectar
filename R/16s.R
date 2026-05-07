@@ -4247,8 +4247,15 @@ setwd("/home/luis/Documentos/3_Doctorado_UNAM/a-proyecto/analisis_florales_tesis
 more2021 <- read.csv("visitas_morelia_2021.csv", header = T)
 head(more2021)
 str(more2021)
+View(more2021)
 more2021$ID.planta
 more2021$codigo.video
+more2021$fecha
+sort(more2021$fecha)
+
+
+tapply(more2021$ID.planta, list(more2021$condicion, more2021$sexo), length)
+
 
 # Cargando librerias
 library(fossil)
@@ -4499,11 +4506,12 @@ str(volumen2)
 #### Análisis de nectar entre tratamientos ####
 setwd("/home/luis/Documentos/3_Doctorado_UNAM/a-proyecto/analisis_florales_tesis_2022/datos_completos/")
 
-azu = read.csv("azucares_2022.csv", header = T, fileEncoding = "latin1")
+azu = read.csv("azucares_2022.csv", header = T)
 head(azu)
 str(azu)
 azu2 =subset(azu, sitio == "morelia")
 head(azu2)
+str(azu2)
 
 tapply(azu2$Suma.total, list(azu2$condicion, azu2$sexo, azu2$trat), length)
 
@@ -4540,12 +4548,16 @@ summary(mod2)
 Anova(mod1)
 
 # Modelo 3: análisis de varianza de Concentración de Sacarosa
-mod3 = aov(azu2$sacarosa ~ azu2$condicion * azu2$sexo * azu2$tratamiento)
+mod3 = glm(sacarosa ~ condicion * sexo * tratamiento,
+           data = azu2, family = gaussian(link = "identity"))
 summary(mod3)
+Anova(mod3)
 
 # Modelo 4: análisis de varianza de Concentración total
-mod4 = aov(azu2$Suma.total ~ azu2$condicion * azu2$sexo * azu2$trat)
+mod4 = glm(Suma.total ~ condicion * sexo * tratamiento,
+           data = azu2, family = gaussian(link = "identity"))
 summary(mod4)
+Anova(mod4)
 
 TukeyHSD(mod4)
 
@@ -4607,11 +4619,13 @@ library(dplyr)
 
 # Convertir id_planta a minúsculas en ambas tablas
 azu2 <- azu2 %>%
-  mutate(año = as.character(año),
+  mutate(ano = as.character(ano),
          id_planta = tolower(id_planta))
 
 hill_wide_ic <- hill_wide_ic %>%
   mutate(id_planta = tolower(id_planta))
+
+
 
 ### Paso 3: Elegir el tipo de join según tu objetivo
 # Inner join: solo conserva filas que coinciden en ambas tablas
@@ -4630,16 +4644,18 @@ str(hill_wide_ic_its)
 str(azu2)
 hill_wide_ic_its$clave
 azu2$clave
+
 # datos de hongos
 datos_unidos_its <- hill_wide_ic_its %>%
   inner_join(azu2 %>%
-               dplyr::select(clave, sexo, tratamiento, fructosa, glucosa,
+               dplyr::select(ano, sexo, tratamiento, fructosa, glucosa,
                              sacarosa, Suma.total),
-             by = c("clave","sexo", "tratamiento"))
+             by = c("ano","sexo", "tratamiento"))
 
 # Verificar cuántas filas quedaron
 dim(datos_unidos_its)
 datos_unidos_its
+View(datos_unidos_its)
 
 
 

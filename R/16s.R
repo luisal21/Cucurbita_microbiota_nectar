@@ -337,7 +337,7 @@ hill_wide_ic <- coverage_incidence %>%
 colnames(hill_wide_ic)
 head(hill_wide_ic)
 View(hill_wide_ic)
-write.csv(hill_wide_ic, file = "Hillnumbers_16s.csv")
+#write.csv(hill_wide_ic, file = "Hillnumbers_16s.csv")
 
 # Paso 1: histogramas de Hill numbers
 hist(hill_wide_ic$qD_q0)
@@ -4997,8 +4997,8 @@ sort(azu2$sexo)
 str(hill_wide_ic)
 head(hill_wide_ic)
 sort(hill_wide_ic$sexo)
-sort(hill_wide_ic$año)
-tapply(hill_wide_ic$qD_q0, hill_wide_ic$año, length)
+sort(hill_wide_ic$ano)
+tapply(hill_wide_ic$qD_q0, hill_wide_ic$ano, length)
 
 ### Paso 1: Verificar los IDs de cada tabla
 # Ver IDs únicos en cada tabla
@@ -5035,19 +5035,14 @@ hill_wide_ic <- hill_wide_ic %>%
 # Inner join: solo conserva filas que coinciden en ambas tablas
 datos_unidos <- hill_wide_ic %>%
   inner_join(azu2 %>%
-               dplyr::select(año, id_planta, sexo, tratamiento, fructosa, glucosa,
+               dplyr::select(ano, id_planta, sexo, tratamiento, fructosa, glucosa,
                              sacarosa, Suma.total),
-             by = c("año","id_planta","sexo", "tratamiento"))
+             by = c("ano","id_planta","sexo", "tratamiento"))
 
 # Verificar cuántas filas quedaron
 dim(datos_unidos)
 datos_unidos
 View(datos_unidos)
-
-str(hill_wide_ic_its)
-str(azu2)
-hill_wide_ic_its$clave
-azu2$clave
 
 # datos de hongos
 datos_unidos_its <- hill_wide_ic_its %>%
@@ -5217,6 +5212,27 @@ library(phyloseq)
 # Filtrar el objeto phyloseq a las 53 muestras
 muestras_53 <- datos_unidos$sampleid2
 ps_53 <- prune_samples(muestras_53, ps_con_arbol)
+nsamples(ps_53)
+dim(asv_53)                        # ¿cuántas filas tiene la matriz?
+length(muestras_53)                # ¿cuántos IDs hay en el vector?
+
+dim(asv_53)                        # ¿cuántas filas tiene la matriz?
+length(muestras_53)                # ¿cuántos IDs hay en el vector?
+
+# Comparar IDs
+ids_datos   <- datos_unidos$sampleid2
+ids_phyloseq <- sample_names(ps_con_arbol)
+
+# ¿Cuántos coinciden?
+sum(ids_datos %in% ids_phyloseq)   # debe ser 53
+
+# Verificar dimensiones detalladas
+dim(otu_table(ps_53))        # ¿cuántas filas y columnas?
+taxa_are_rows(ps_53)         # TRUE = ASVs en filas, FALSE = ASVs en columnas
+
+# Ver las primeras filas y columnas
+otu_table(ps_53)[1:3, 1:3]
+
 
 # Recalcular beta diversidad
 asv_53    <- t(as.data.frame(otu_table(ps_53)))
@@ -5265,6 +5281,9 @@ library(vegan)
 # Matriz de ASVs de las 53 muestras completas
 asv_53 <- t(as.data.frame(otu_table(ps_53)))
 #asvs <- t(as.data.frame(otu_table(s16_6)))
+unifrac_w  <- UniFrac(ps_con_arbol, weighted = TRUE, normalized = TRUE)
+
+dim(asv_53)
 
 # NMDS
 set.seed(123)
@@ -5275,7 +5294,7 @@ nmds <- metaMDS(asv_53,
 
 # Verificar el stress (debe ser < 0.2)
 nmds$stress
-
+names(datos_unidos)
 # Variables ambientales (azúcares)
 azucares <- datos_unidos %>%
   dplyr::select(fructosa, glucosa, sacarosa, Suma.total)
@@ -5291,6 +5310,192 @@ print(ef)
 
 # Graficar todas las flechas aunque no sean significativas
 # pero indicando cuáles son significativas
+# Extraer coordenadas del NMDS
+# 1. Construir nmds_coords
+nmds_coords <- as.data.frame(scores(nmds, display = "sites"))
+nmds_coords <- cbind(nmds_coords, 
+                     condicion   = datos_unidos$condicion,
+                     tratamiento = datos_unidos$tratamiento,
+                     sexo        = datos_unidos$sexo)
+
+# 2. Construir ef_coords desde el envfit
+ef_coords <- as.data.frame(scores(ef, display = "vectors"))
+ef_coords$variable <- rownames(ef_coords)
+ef_coords$r2       <- ef$vectors$r
+ef_coords$pval     <- ef$vectors$pvals
+ef_coords$sig      <- ifelse(ef_coords$pval < 0.05, "p < 0.05", "p > 0.05")
+
+# 3. Verificar que los objetos tienen el formato correcto
+head(nmds_coords)
+head(ef_coords)
+
+# 4. Gráfica
+ggplot(nmds_coords, aes(x = NMDS1, y = NMDS2)) +
+  geom_point(aes(color = condicion, shape = tratamiento),
+             size = 3, alpha = 0.8) +
+  stat_ellipse(aes(color = condicion, group = condicion),
+               linewidth = 0.7) +
+  geom_segment(data = ef_coords,
+               aes(x = 0, y = 0,
+                   xend    = NMDS1 * 0.3,
+                   yend    = NMDS2 * 0.3,
+                   linetype = sig),
+               arrow     = arrow(length = unit(0.3, "cm")),
+               color     = "black",
+               linewidth = 0.7) +
+  geom_text(data = ef_coords,
+            aes(x     = NMDS1 * 0.35,
+                y     = NMDS2 * 0.35,
+                label = paste0(variable, "\n(r²=",
+                               round(r2, 3), ", p=",
+                               round(pval, 3), ")")),
+            size = 3, fontface = "italic") +
+  scale_color_manual(values  = c("domesticada" = "#C0392B",
+                                 "silvestre"   = "#2980B9")) +
+  scale_shape_manual(values  = c("t1" = 16, "t2" = 17),
+                     labels  = c("t1" = "Unvisited",
+                                 "t2" = "Visited")) +
+  scale_linetype_manual(values = c("p < 0.05" = "solid",
+                                   "p > 0.05" = "dashed")) +
+  theme_bw(base_size = 13) +
+  theme(strip.background = element_rect(fill = "grey90"),
+        strip.text       = element_text(face = "bold")) +
+  labs(title    = paste0("NMDS Bray-Curtis (stress = ",
+                         round(nmds$stress, 3), ")"),
+       color    = "Condición",
+       shape    = "Tratamiento",
+       linetype = "Significancia")
+
+
+
+
+muestras_problematicas <- c("ENESMo24-cLVEv416s130", "ENESMo24-cLVEv416s138")
+
+# Suma de secuencias por muestra
+seq_por_muestra <- rowSums(asv_53)
+seq_por_muestra[muestras_problematicas]
+
+# Ver el mínimo y distribución
+summary(seq_por_muestra)
+hist(seq_por_muestra, main = "Secuencias por muestra")
+
+# Ver las distancias de esas muestras al resto
+dist_mat <- as.matrix(dist_bray_53)
+dist_mat[muestras_problematicas, 1:5]
+
+# Si tienen distancia = 1 con todas las demás muestras
+# significa que no comparten ningún ASV con el resto
+
+# Eliminar las muestras problemáticas
+muestras_ok <- setdiff(rownames(asv_53), muestras_problematicas)
+
+asv_53_limpio       <- asv_53[muestras_ok, ]
+datos_completos_ok  <- datos_unidos %>%
+  filter(!sampleid2 %in% muestras_problematicas)
+
+# Verificar
+dim(asv_53_limpio)        # debe ser 51 × ASVs
+nrow(datos_completos_ok)  # debe ser 51
+
+# Recalcular NMDS sin las muestras problemáticas
+set.seed(123)
+nmds_limpio <- metaMDS(asv_53_limpio,
+                       distance = "bray",
+                       k        = 2,
+                       trymax   = 100)
+
+nmds_limpio$stress  # ahora debe ser > 0 y < 0.2
+
+# Nuevas coordenadas sin muestras problemáticas
+nmds_coords_ok <- as.data.frame(scores(nmds_limpio, display = "sites"))
+nmds_coords_ok <- cbind(nmds_coords_ok,
+                        condicion   = datos_completos_ok$condicion,
+                        tratamiento = datos_completos_ok$tratamiento,
+                        sexo        = datos_completos_ok$sexo)
+
+# Recalcular envfit
+azucares_ok <- datos_completos_ok %>%
+  dplyr::select(fructosa, glucosa, sacarosa, Suma.total)
+
+set.seed(123)
+ef_ok <- envfit(nmds_limpio, azucares_ok,
+                permutations = 999,
+                na.rm        = TRUE)
+print(ef_ok)
+
+# 1. Construir nmds_coords con muestras limpias
+nmds_coords_ok <- as.data.frame(scores(nmds_limpio, display = "sites"))
+nmds_coords_ok <- cbind(nmds_coords_ok,
+                        condicion   = datos_completos_ok$condicion,
+                        tratamiento = datos_completos_ok$tratamiento,
+                        sexo        = datos_completos_ok$sexo)
+
+# 2. Construir ef_coords desde el envfit limpio
+ef_coords_ok <- as.data.frame(scores(ef_ok, display = "vectors"))
+ef_coords_ok$variable <- rownames(ef_coords_ok)
+ef_coords_ok$r2       <- ef_ok$vectors$r
+ef_coords_ok$pval     <- ef_ok$vectors$pvals
+ef_coords_ok$sig      <- ifelse(ef_coords_ok$pval < 0.05, "p < 0.05", "p > 0.05")
+
+# 3. Gráfica
+ggplot(nmds_coords_ok, aes(x = NMDS1, y = NMDS2)) +
+  geom_point(aes(color = condicion, shape = tratamiento),
+             size = 3, alpha = 0.8) +
+  stat_ellipse(aes(color = condicion, group = condicion),
+               linewidth = 0.7) +
+  geom_segment(data = ef_coords_ok,
+               aes(x = 0, y = 0,
+                   xend     = NMDS1 * 0.3,
+                   yend     = NMDS2 * 0.3,
+                   linetype = sig),
+               arrow     = arrow(length = unit(0.3, "cm")),
+               color     = "black",
+               linewidth = 0.7) +
+  geom_text(data = ef_coords_ok,
+            aes(x     = NMDS1 * 0.35,
+                y     = NMDS2 * 0.35,
+                label = paste0(variable, "\n(r²=",
+                               round(r2, 3), ", p=",
+                               round(pval, 3), ")")),
+            size     = 3,
+            fontface = "italic") +
+  scale_color_manual(values  = c("domesticada" = "#C0392B",
+                                 "silvestre"   = "#2980B9"),
+                     labels  = c("domesticada" = "Domesticated",
+                                 "silvestre"   = "Wild")) +
+  scale_shape_manual(values  = c("t1" = 16, "t2" = 17),
+                     labels  = c("t1" = "Unvisited",
+                                 "t2" = "Visited")) +
+  scale_linetype_manual(values = c("p < 0.05" = "solid",
+                                   "p > 0.05" = "dashed")) +
+  theme_bw(base_size = 13) +
+  theme(legend.position  = "right",
+        strip.background = element_rect(fill = "grey90"),
+        strip.text       = element_text(face = "bold")) +
+  labs(title    = paste0("NMDS Bray-Curtis (stress = ",
+                         round(nmds_limpio$stress, 3), ")"),
+       x        = "NMDS1",
+       y        = "NMDS2",
+       color    = "Condición",
+       shape    = "Tratamiento",
+       linetype = "Significancia")
+
+
+
+
+
+
+nmds_coords <- as.data.frame(scores(nmds, display = "sites"))
+nmds_coords <- cbind(nmds_coords, azucares)
+
+# Extraer vectores de envfit (solo los significativos)
+ef_coords <- as.data.frame(scores(ef, display = "vectors"))
+ef_coords$variable <- rownames(ef_coords)
+ef_coords$r2       <- ef$vectors$r
+ef_coords$pval     <- ef$vectors$pvals
+
+
+
 ef_coords <- ef_coords %>%
   mutate(sig = ifelse(pval < 0.05, "p < 0.05", "p > 0.05"))
 

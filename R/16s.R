@@ -4250,9 +4250,9 @@ str(more2021)
 View(more2021)
 more2021$ID.planta
 more2021$codigo.video
-more2021$fecha
+sort(more2021$Hora.visita.real)
 sort(more2021$fecha)
-
+more2021$duración.decimal
 
 tapply(more2021$ID.planta, list(more2021$condicion, more2021$sexo), length)
 
@@ -4262,7 +4262,7 @@ library(fossil)
 library (bipartite)
 
 
-### Horas totales de grabación entre 2021 y 2022: 128:52:28
+### Horas totales de grabación entre 2021 y 2022: 106 horas
 # Horas de grabación por especie
 # CPF: 7:31:30
 # CPP: 30:41:42
@@ -4281,7 +4281,8 @@ library (bipartite)
 
 
 # numero de visitas por especie
-tapply(more2021$especie, more2021$condicion, length)
+tapply(more2021$especie, list(more2021$condicion,more2021$sexo), length)
+
 tapply(more2021$especie, more2021$Especie.planta, length)
 
 #
@@ -4293,15 +4294,314 @@ visitas <- more2021 %>%
 frec <- more2021 %>%
   dplyr::group_by(año, fecha, condicion, ID.planta, sexo, especie,
                   duración.decimal) %>%
-  dplyr::summarize(num_visitas = length(especie)) %>% 
-  dplyr::mutate(frecu = num_visitas/duración.decimal)
+  dplyr::summarize(num_visitas = n()) %>% 
+  dplyr::mutate(
+    duracion_horas = duración.decimal / 60,  # convertir a horas
+    frecu = num_visitas / duracion_horas      # visitas por hora
+  )
+frec
+View(frec)
 
+sum(frec$num_visitas)
+tapply(frec$num_visitas, frec$especie, sum)
+tapply(frec$num_visitas, list(frec$especie,frec$condicion, frec$sexo), sum)
+(587/1145)*100 # apis
+(387/1145)*100 # pepo macho
+(88/1145)*100 # xenoglossa
+(73/1145)*100 # pepo hembra
+(7/1145)*100 # halictidae
+(2/1145)*100 # xilocopa
+(1/1145)*100 # syrphidae
+(3/1145)*100 # syrphidae
+
+frec$especie
+tapply(frec$frecu, frec$especie, length)
+hist(frec$frecu)
+sum(frec$frecu == 0)
+
+# contabilizando cuantos datos tengo de cada especie
+frec %>%
+  group_by(especie) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+# agrupando las 2 especies menos frecuentes en other
+frec <- frec %>%
+  mutate(especie_agrupada = case_when(
+    especie %in% c("Xilocopa_tabaniformis", 
+                   "Syrphidae") ~ "Other",
+    TRUE ~ as.character(especie)
+  ))
+
+# Verificar
+frec %>%
+  group_by(especie_agrupada) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+
+
+### Modelos estadisticos
+modvis = glm(frecu ~ condicion * sexo,
+    data = frec, family = Gamma(link = "log"))
+summary(modvis)
+Anova(modvis)
+
+modvis2 = glm(frecu ~ condicion * sexo * especie_agrupada,
+              data = frec, family = Gamma(link = "log"))
+summary(modvis2)
+Anova(modvis2)
+
+library(emmeans)
+library(multcomp)
+#install.packages("multcompView")
+library(multcompView)
+
+# Letras de significancia por especie (efecto más fuerte, p < 0.001)
+emm <- emmeans(modvis2, ~ especie | sexo,
+               type = "response")
+pares <- pairs(emm, adjust = "BH")
+summary(pares)
+
+
+emm_esp <- emmeans(modvis2, ~ especie_agrupada, type = "response")
+emm_esp
+# Comparaciones entre especies dentro de cada grupo
+pares <- pairs(emm_esp, adjust = "BH")
+summary(pares)
+
+letras <- cld(emm_esp, adjust = "BH", Letters = letters)
+print(letras)
+
+
+######### plot
+library(ggplot2)
+library(dplyr)
+
+# Calcular media y error estándar por especie agrupada y condición
+frec_summary <- frec %>%
+  group_by(especie_agrupada, condicion) %>%
+  summarise(
+    media = mean(frecu),
+    se    = sd(frecu) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Ordenar por media descendente para mejor visualización
+orden_especies <- frec_summary %>%
+  group_by(especie_agrupada) %>%
+  summarise(media_total = mean(media)) %>%
+  arrange(desc(media_total)) %>%
+  pull(especie_agrupada)
+
+frec_summary <- frec_summary %>%
+  mutate(especie_agrupada = factor(especie_agrupada, 
+                                   levels = orden_especies))
+
+# Gráfica
+ggplot(frec_summary, aes(x = especie_agrupada,
+                         y = media,
+                         fill = condicion)) +
+  geom_col(position = position_dodge(width = 0.8),
+           width = 0.7,
+           color = "black",
+           linewidth = 0.3) +
+  geom_errorbar(aes(ymin = media - se,
+                    ymax = media + se),
+                position = position_dodge(width = 0.8),
+                width = 0.25,
+                linewidth = 0.3) +
+  scale_fill_manual(values = c("domesticada" = "white",
+                               "silvestre"   = "black"),
+                    labels = c("domesticada" = "Domesticated",
+                               "silvestre"   = "Wild")) +
+  scale_x_discrete(labels = c(
+    "Peponapis_macho"  = "Peponapis sp. ♂",
+    "Peponapis_hembra" = "Peponapis sp. ♀",
+    "Xenoglossa"       = "Xenoglossa sp.",
+    "Apis_mellifera"   = "Apis mellifera",
+    "Halictidae"       = "Halictidae",
+    "Other"            = "Other"
+  )) +
+  labs(x = NULL,
+       y = expression("Mean visitation rate (visits hour"^-1*")"),
+       fill = NULL) +
+  theme_classic() +
+  theme(
+    axis.text.x   = element_text(angle = 45, hjust = 1,
+                                 face = "italic", size = 9),
+    axis.text.y   = element_text(size = 10),
+    axis.title.y  = element_text(size = 11),
+    legend.position = "top",
+    legend.text   = element_text(size = 10)
+  )
+
+##########
+# Calcular media y error estándar por especie agrupada, condición y sexo
+frec_summary <- frec %>%
+  group_by(especie_agrupada, condicion, sexo) %>%
+  summarise(
+    media = mean(frecu),
+    se    = sd(frecu) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Ordenar por media descendente
+orden_especies <- frec_summary %>%
+  group_by(especie_agrupada) %>%
+  summarise(media_total = mean(media)) %>%
+  arrange(desc(media_total)) %>%
+  pull(especie_agrupada)
+
+frec_summary <- frec_summary %>%
+  mutate(especie_agrupada = factor(especie_agrupada,
+                                   levels = orden_especies))
+
+# Gráfica con facet por sexo
+ggplot(frec_summary, aes(x = especie_agrupada,
+                         y = media,
+                         fill = condicion)) +
+  geom_col(position = position_dodge(width = 0.8),
+           width = 0.7,
+           color = "black",
+           linewidth = 0.3) +
+  geom_errorbar(aes(ymin = media - se,
+                    ymax = media + se),
+                position = position_dodge(width = 0.8),
+                width = 0.25,
+                linewidth = 0.3) +
+  scale_fill_manual(values = c("domesticada" = "white",
+                               "silvestre"   = "black"),
+                    labels = c("domesticada" = "Domesticated",
+                               "silvestre"   = "Wild")) +
+  scale_x_discrete(labels = c(
+    "Peponapis_macho"  = "Peponapis sp. ♂",
+    "Peponapis_hembra" = "Peponapis sp. ♀",
+    "Xenoglossa"       = "Xenoglossa sp.",
+    "Apis_mellifera"   = "Apis mellifera",
+    "Halictidae"       = "Halictidae",
+    "Other"            = "Other"
+  )) +
+  facet_wrap(~ sexo,
+             ncol = 1,
+             labeller = labeller(sexo = c(
+               "H" = "Pistillate flowers",
+               "M" = "Staminate flowers"
+             ))) +
+  labs(x = NULL,
+       y = expression("Mean visitation rate (visits hour"^-1*")"),
+       fill = NULL) +
+  theme_classic() +
+  theme(
+    axis.text.x   = element_text(angle = 45, hjust = 1,
+                                 face = "italic", size = 9),
+    axis.text.y   = element_text(size = 10),
+    axis.title.y  = element_text(size = 11),
+    legend.position = "top",
+    legend.text   = element_text(size = 10),
+    strip.text    = element_text(size = 10, face = "bold"),
+    strip.background = element_rect(fill = "gray95", color = "black")
+  )
+
+############################
+library(ggplot2)
+library(dplyr)
+
+# Calcular media y error estándar por especie
+frec_summary_esp <- frec %>%
+  group_by(especie_agrupada) %>%
+  summarise(
+    media = mean(frecu),
+    se    = sd(frecu) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# Agregar letras del cld
+letras_df <- as.data.frame(letras) %>%
+  dplyr::select(especie_agrupada, .group) %>%
+  mutate(.group = trimws(.group))
+
+frec_summary_esp <- left_join(frec_summary_esp, letras_df, by = "especie_agrupada")
+
+# Ordenar por media descendente
+frec_summary_esp <- frec_summary_esp %>%
+  mutate(especie_agrupada = factor(especie_agrupada, 
+                          levels = especie_agrupada[order(media, decreasing = FALSE)]))
+
+# Gráfica
+ggplot(frec_summary_esp, aes(x = especie_agrupada, y = media)) +
+  geom_col(width = 0.7,
+           color = "black",
+           fill  = "gray80",
+           linewidth = 0.3) +
+  geom_errorbar(aes(ymin = media - se,
+                    ymax = media + se),
+                width = 0.25,
+                linewidth = 0.3) +
+  geom_text(aes(y = media + se + 0.3,
+                label = .group),
+            size = 4) +
+  scale_x_discrete(labels = c(
+    "Peponapis_macho"      = "Peponapis sp. ♂",
+    "Peponapis_hembra"     = "Peponapis sp. ♀",
+    "Xenoglossa"           = "Xenoglossa sp.",
+    "Apis_mellifera"       = "Apis mellifera",
+    "Halictidae"           = "Halictidae",
+    "Other"                = "Other"
+  )) +
+  coord_flip() +
+  labs(x = NULL,
+       y = expression("Mean visitation rate (visits hour"^-1*")")) +
+  theme_classic() +
+  theme(
+    axis.text.x  = element_text(size = 10),
+    axis.text.y  = element_text(face = "italic", size = 9),
+    axis.title.x = element_text(size = 11)
+  )
+
+
+###########3
+frec_summary_int <- frec %>%
+  group_by(especie_agrupada, condicion, sexo) %>%
+  summarise(
+    media = mean(frecu),
+    se    = sd(frecu) / sqrt(n()),
+    .groups = "drop"
+  )
+
+ggplot(frec_summary_int, 
+       aes(x = reorder(especie_agrupada, media),
+           y = media,
+           fill = condicion)) +
+  geom_col(position = position_dodge(0.8),
+           width = 0.7, color = "black", linewidth = 0.3) +
+  geom_errorbar(aes(ymin = media - se, ymax = media + se),
+                position = position_dodge(0.8),
+                width = 0.25, linewidth = 0.3) +
+  scale_fill_manual(values = c("domesticada" = "white",
+                               "silvestre"   = "black"),
+                    labels = c("domesticada" = "Domesticated",
+                               "silvestre"   = "Wild")) +
+  facet_wrap(~ sexo, ncol = 1,
+             labeller = labeller(sexo = c("H" = "Pistillate",
+                                          "M" = "Staminate"))) +
+  coord_flip() +
+  labs(x = NULL,
+       y = expression("Mean visitation rate (visits hour"^-1*")"),
+       fill = NULL) +
+  theme_classic() +
+  theme(
+    axis.text.y  = element_text(face = "italic"),
+    legend.position = "top",
+    strip.text = element_text(face = "bold")
+  )
+##############################################################################
+### Promediando la frecuencia de visita para la red
 frec2 <- frec %>%
-  dplyr::group_by(condicion, sexo, especie) %>%
+  dplyr::group_by(condicion, sexo, especie_agrupada) %>%
   dplyr::summarize(mean_frec = mean(frecu))
+frec2
 
-
-View(frec2)
 #
 ggplot(frec, aes(condicion, fill = especie))+
   geom_bar()
@@ -4330,8 +4630,7 @@ df1_vis <- t(df_vis)
 frec3 = frec2 %>%
   unite("plant_sex", condicion:sexo)
 #write.csv(frec3, file = "frecuencias_visitas.csv")
-
-df <- create.matrix(as.data.frame(frec3), tax.name = "especie",
+df <- create.matrix(as.data.frame(frec3), tax.name = "especie_agrupada",
                     locality = "plant_sex",
                     abund.col = "mean_frec",
                     abund = TRUE)
@@ -4347,11 +4646,25 @@ plotweb(df1_vis,method="normal", y.lim=c(-1,2.5), labsize=1.2, text.rot=90,
         col.high = "brown4", col.low = "#D9A404")
 
 # frecuencia de visita
-plotweb(df1,method="normal", y.lim=c(-1,2.5), labsize=1.2, text.rot=90,
-        col.high = "brown4", col.low = "#D9A404")
-plotweb(df1, sorting = "normal", higher_color = "#E6AB02",
+plotweb(df1, sorting = "dec", higher_color = "#E6AB02",
         lower_color = "#4D9221")
 
+
+### Metricas básicas de la red
+# Calcular métricas de red
+networklevel(df1, index = c(
+  "connectance",           # proporción de interacciones realizadas vs posibles
+  "linkage density",       # número promedio de interacciones por especie
+  "weighted connectance",  # conectancia ponderada por frecuencia
+  "H2"                     # especialización a nivel de red (0=generalista, 1=especialista)
+))
+
+# Métricas a nivel de especie
+specieslevel(df1, index = c(
+  "degree",           # número de interacciones por especie
+  "normalised degree", # grado normalizado
+  "d"                 # especialización individual
+))
 
 specieslevel(df1)
 beeR<-specieslevel(df1)
@@ -4531,10 +4844,7 @@ hist(azu2$glucosa)
 hist(azu2$sacarosa)
 hist(azu2$Suma.total)
 
-azu2$fructosa
-azu2$glucosa
-
-# Modelo 1: análisis de varianza de Concentración de fructosa
+# Modelo 1: GLM de concentración de fructosa
 mod1 = glm(fructosa ~ condicion * sexo * tratamiento, 
            data = azu2, family = Gamma(link = "log"))
 summary(mod1)
@@ -4545,7 +4855,7 @@ Anova(mod1)
 mod2 = glm(glucosa ~ condicion * sexo * tratamiento, 
            data = azu2, family = Gamma(link = "log"))
 summary(mod2)
-Anova(mod1)
+Anova(mod2)
 
 # Modelo 3: análisis de varianza de Concentración de Sacarosa
 mod3 = glm(sacarosa ~ condicion * sexo * tratamiento,
@@ -4559,11 +4869,10 @@ mod4 = glm(Suma.total ~ condicion * sexo * tratamiento,
 summary(mod4)
 Anova(mod4)
 
-TukeyHSD(mod4)
 
 # media
 media2 = azu2 %>%
-  dplyr::group_by(condicion, sexo, trat) %>%
+  dplyr::group_by(tratamiento) %>%
   dplyr::summarize(fruc_m = mean(fructosa), glu_m = mean(glucosa),
                    sac_m = mean(sacarosa),
                    tot_m = mean(Suma.total))
@@ -4583,6 +4892,101 @@ boxplot(azu2$Suma.total ~ azu2$sexo)
 boxplot(azu2$Suma.total ~ azu2$trat)
 
 boxplot(azu2$Suma.total ~ azu2$condicion + azu2$trat)
+
+### Gráfica de Hill numbers: q0
+head(azu2)
+nombres_condicion <- c("domesticada" = "Domesticated",
+                       "silvestre"   = "Wild")
+
+nombres_sexo <- c("hembra" = "Pistillate",
+                  "macho"  = "Staminate")
+# plot
+nectar = ggplot(azu2, aes(y = sacarosa, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  facet_grid(sexo ~ condicion,
+             labeller = labeller(
+               condicion = nombres_condicion,
+               sexo = nombres_sexo
+             ))+
+  labs(x = "Treatment",
+       y = "Sugar concentration (w/v)")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
+
+nectar
+
+# plot 1 : fructosa
+plot1 = ggplot(azu2, aes(y = fructosa, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  labs(x = "Treatment",
+       y = "Sugar concentration (w/v)")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
+plot1
+# plot 2 : Glucose
+plot2 = ggplot(azu2, aes(y = glucosa, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  labs(x = "Treatment",
+       y = "Sugar concentration (w/v)")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
+plot2
+# plot 3 : Glucose
+plot3 = ggplot(azu2, aes(y = sacarosa, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  labs(x = "Treatment",
+       y = "Sugar concentration (w/v)")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
+plot3
+# plot 4 : total
+plot4 = ggplot(azu2, aes(y = Suma.total, x = tratamiento, fill = tratamiento))+
+  geom_boxplot(alpha = .8)+
+  geom_signif(comparisons  = list(c("t1", "t2")),  # grupos a comparar
+              annotations  = "*",                   # ← asterisco
+              y_position   = max(azu2$Suma.total, na.rm = TRUE) * .9,
+              tip_length   = 0.02,
+              textsize     = 5) +
+  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  labs(x = "Treatment",
+       y = "Sugar concentration (w/v)")+
+  scale_x_discrete(label = c("t1" = "Unvisited", "t2" = "Visited"))+
+  scale_fill_discrete(name = "tratamiento", 
+                      labels = c("t1" = "Unvisited",
+                                 "t2" = "Visited"),
+                      palette = c("#E6AB02","#4D9221"))+
+  theme_bw()+
+  theme(legend.position = "none")
+plot4
+
+plot_azucar = ggarrange(plot1, plot2, plot3, plot4,
+                        nrow = 2, ncol = 2, labels = "AUTO")
+plot_azucar
+
 
 
 str(azu2)

@@ -968,7 +968,7 @@ ordination_16s_wei = ordinate(ps_con_arbol,
 baseplot_16s_wei <- plot_ordination(ps_con_arbol, 
                                     ordination_16s_wei,
                                     color="tratamiento",
-                                    #shape = "sexo",
+                                    shape = "sexo",
                                     type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("")+
   theme(aspect.ratio=1)+
@@ -1327,10 +1327,10 @@ ggplot(res_sex_16s_plot,
   theme(legend.position = "top")
 
 
-# Tratamiento
+### Tratamiento ###
 ancom_trat_16s <- ancombc2(
   data = s16_6,
-  tax_level = "Family",
+  tax_level = "Genus",
   fix_formula = "tratamiento",
   p_adj_method = "BH",
   alpha = 0.05,
@@ -1371,6 +1371,26 @@ ancom_16s_trat = ggplot(res_trat_16s_plot,
 
 
 ancom_16s_trat
+
+# Grafica
+ancom_16s_trat = ggplot(res_trat_16s_plot, 
+                        aes(x = reorder(taxon, lfc_tratamientot2),
+                            y = lfc_tratamientot2,
+                            fill = direccion)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip() +
+  scale_fill_manual(values = "tomato") + #"steelblue"
+  labs(x = "Genus",
+       y = "log2 Fold Change (visited vs. unvisited)",
+       fill = NULL) +
+  theme_bw() +
+  theme(legend.position = "top")
+
+
+ancom_16s_trat
+
+citation()
 ###############################################################################
 ###############################################################################
 # install microViz
@@ -1389,7 +1409,7 @@ s16_prop <- transform(s16_6, "compositional")
 otu_table(s16_prop)[1:10, 1:10]
 head(sample_sums(s16_prop))
 
-s16_prop %>%
+its_prop %>%
   tax_fix(unknowns = c("Incertae Sedis")) %>%
   comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
   coord_flip() +
@@ -1406,13 +1426,22 @@ s16_prop %>%
 
 # ITS (fungi)
 transform <- microbiome::transform
-ps_prop <- transform(s16_6, "compositional")
-otu_table(ps_prop)[1:10, 1:10]
-head(sample_sums(ps_prop))
+its_prop <- transform(its6, "compositional")
+otu_table(its_prop)[1:10, 1:10]
+head(sample_sums(its_prop))
+
+its_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+
 
 ps_prop %>%
   tax_fix() %>%
-  comp_barplot(tax_level = "Genus", n_taxa = 15, facet_by = "tratamiento",
+  comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento",
                group_by = "")+
   coord_flip() +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())

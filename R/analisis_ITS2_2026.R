@@ -871,7 +871,7 @@ ordination_wei_its = ordinate(ps_con_arbol_its,
 baseplot_wei_its <- plot_ordination(ps_con_arbol_its, 
                                     ordination_wei_its,
                                     color="tratamiento",
-                                    #shape = "sexo",
+                                    shape = "sexo",
                                     type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("")+
   theme(aspect.ratio=1)+
@@ -899,11 +899,11 @@ baseplot_wei_its <- plot_ordination(ps_con_arbol_its,
 #baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
 baseplot_wei_its
 pcoa_its = baseplot_wei_its + stat_ellipse(linetype = 2)
-
+pcoa_its
 
 # Uniendo plots de PCoA
-beta = ggarrange(pcoa_16s, pcoa_its,
-                 nrow = 1, labels = "AUTO",
+beta = ggarrange(baseplot_16s_wei, baseplot_wei_its,
+                 nrow = 2, labels = "AUTO",
                  common.legend = TRUE, legend = "bottom")
 
 beta
@@ -1184,7 +1184,7 @@ ggplot(res_sex_its_plot,
 # Tratamiento
 ancom_trat_its <- ancombc2(
   data = its6,
-  tax_level = "Family",
+  tax_level = "Genus",
   fix_formula = "tratamiento",
   p_adj_method = "BH",
   alpha = 0.05,
@@ -1216,7 +1216,7 @@ ancom_its_trat = ggplot(res_trat_its_plot,
   geom_hline(yintercept = 0, linetype = "dashed") +
   coord_flip() +
   scale_fill_manual(values = c("steelblue", "tomato")) +
-  labs(x = "Family",
+  labs(x = "Genus",
        y = "log2 Fold Change (visited vs. unvisited)",
        fill = NULL) +
   theme_bw() +
@@ -1277,3 +1277,7 @@ cat("Suma total:", sum(df_final_global$Percentage), "%\n")
 View(df_final_global)
 write.csv(df_final_global, "abundancias_top10_global.csv")
 
+
+
+citation("ShortRead")
+citation("")

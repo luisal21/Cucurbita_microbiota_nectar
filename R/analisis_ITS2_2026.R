@@ -26,6 +26,16 @@ library(stats4)
 ### change directory
 setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_its")
 
+### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
+# deshabilitar este codigo
+### Transponer tabla de ASV
+#asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
+#head(asvtable, 1)
+#asv2 = t(asvtable)
+#head(asv2, 1)
+#write.csv(asv2, file = "asv_table.csv")
+
+
 # cargar primero el archivo de metadatos
 meta_its <- read.csv("its_metadata_2024.csv", header = T)
 head(meta_its)
@@ -901,6 +911,9 @@ baseplot_wei_its
 pcoa_its = baseplot_wei_its + stat_ellipse(linetype = 2)
 pcoa_its
 
+
+# El paquete ggpubr es para unir graficas en paneles
+library("ggpubr")
 # Uniendo plots de PCoA
 beta = ggarrange(baseplot_16s_wei, baseplot_wei_its,
                  nrow = 2, labels = "AUTO",

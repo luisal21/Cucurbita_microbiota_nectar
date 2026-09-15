@@ -3,9 +3,9 @@
 #### Marzo 2026
 
 
-#if (!require("BiocManager", quietly = TRUE))
-#  install.packages("BiocManager")
-#BiocManager::install("phyloseq")
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("phyloseq")
 
 #### Cargando paquete phyloseq y paquetes adicionales ####
 library(phyloseq)

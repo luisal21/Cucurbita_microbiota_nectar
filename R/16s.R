@@ -3,9 +3,11 @@
 #### Marzo 2026
 
 
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install("phyloseq")
+#if (!require("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+
+#BiocManager::install("phyloseq")
+#BiocManager::install("microbiome")
 
 #### Cargando paquete phyloseq y paquetes adicionales ####
 library(phyloseq)
@@ -94,6 +96,7 @@ summarize_phyloseq(s16_2) #13,731,996 reads, 4160 ASVs in 356 samples
                           
 
 # Remove contaminants using the frecuency method of the package decontam
+#BiocManager::install("decontam")
 library(decontam)
 
 head(sample_data(s16_2))
@@ -409,7 +412,7 @@ nombres_sexo <- c("hembra" = "Pistillate",
 # plot
 bacterias_hill = ggplot(hill_wide_ic, aes(y = qD_q0, x = tratamiento, fill = tratamiento))+
   geom_boxplot(alpha = .8)+
-  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
   facet_grid(sexo ~ condicion,
              labeller = labeller(
                condicion = nombres_condicion,
@@ -1410,19 +1413,22 @@ s16_prop <- transform(s16_6, "compositional")
 otu_table(s16_prop)[1:10, 1:10]
 head(sample_sums(s16_prop))
 
+# gráfica modificada para bacterias
+s16_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 20)+
+  #facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+# Gráfica para hongos
 its_prop %>%
   tax_fix(unknowns = c("Incertae Sedis")) %>%
   comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
   coord_flip() +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
 
-# modificada
-s16_prop %>%
-  tax_fix(unknowns = c("Incertae Sedis")) %>%
-  comp_barplot(tax_level = "Family", n_taxa = 15)+
-  facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
-  coord_flip() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
 
 
 # ITS (fungi)
@@ -1478,7 +1484,7 @@ top10_global <- df_grouped_global %>%
 
 cat("Top 10 familias más abundantes:\n")
 print(top10_global)
-write.csv(top10_global, file = "top10_familias_bacterias.csv")
+#write.csv(top10_global, file = "top10_familias_bacterias.csv")
 
 # F. Crear categoría "Other" para el resto
 df_final_global <- df_grouped_global %>%
@@ -1500,6 +1506,49 @@ View(df_final_global)
 write.csv(df_final_global, "abundancias_top10_global.csv")
 
 ###############################################################################
+### Usando codigo de metagenomics carprentries
+percentages <- transform_sample_counts(s16_6, function(x) x*100 / sum(x) )
+head(percentages@otu_table@.Data)
+
+
+percentages_glom <- tax_glom(percentages, taxrank = 'Family')
+
+View(percentages_glom@tax_table@.Data)
+
+
+percentages_df <- psmelt(percentages_glom)
+str(percentages_df)
+
+
+percentages_df$Family <- as.factor(percentages_df$Family)
+
+family_colors_rel<- colorRampPalette(brewer.pal(8,"Dark2")) (length(levels(percentages_df$Family)))
+
+relative_plot <- ggplot(data=percentages_df, aes(x=Sample, y=Abundance,
+                                                 fill=Family))+ 
+  geom_bar(aes(), stat="identity", position="stack")+
+  scale_fill_manual(values = family_colors_rel)
+
+relative_plot
+
+# Agrupando las familias menos abundantes
+percentages_df$Family <- as.character(percentages_df$Family) # Return the Phylum column to be of type character
+percentages_df$Family[percentages_df$Abundance < 30] <- "Families < 30% abund."
+unique(percentages_df$Family)
+
+# Gráfica a nivel de familia
+percentages_df$Family <- as.factor(percentages_df$Family)
+
+family_colors_rel<- colorRampPalette(brewer.pal(8,
+                    "Dark2")) (length(levels(percentages_df$Family)))
+
+relative_plot <- ggplot(data=percentages_df, aes(x=Sample, y=Abundance,
+                                                 fill=Family))+ 
+  geom_bar(aes(), stat="identity", position="stack")+
+  scale_fill_manual(values = family_colors_rel)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+relative_plot
+
 #### EXTRAYENDO LAS MUESTRAS DE FLORES VISITADAS PARA CONSTRUIR REDES
 ### DE INTERACCIÓN
 visitadas <- subset_samples(ps_con_arbol, tratamiento == "t2")

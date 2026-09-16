@@ -155,6 +155,15 @@ data.frame(
   N_taxones = c(n_phyla, n_classes, n_orders, n_families, n_genera, n_species)
 )
 
+
+
+# Función para quitar cualquier prefijo tipo "x__" (k__, p__, c__, o__, f__, g__, s__)
+quitar_prefijos <- function(x) {
+  gsub("^[a-z]__", "", x)
+}
+
+tax_table(its6) <- apply(tax_table(its6), 2, quitar_prefijos)
+
 #############################################################################
 ###############################################################################
 ###############################################################################
@@ -205,8 +214,8 @@ out_condicion <- iNEXT(asv_por_condicion,
 out_condicion$DataInfo
 out_condicion$AsyEst
 
-write.csv(out_condicion$DataInfo, file = "Hill_condicion_datainfo.csv")
-write.csv(out_condicion$AsyEst, file = "Hill_condicion_asyest.csv")
+#write.csv(out_condicion$DataInfo, file = "Hill_condicion_datainfo.csv")
+#write.csv(out_condicion$AsyEst, file = "Hill_condicion_asyest.csv")
 
 coverage_incidence_con <- estimateD(asv_por_condicion,
                                     q = c(0, 1, 2),
@@ -310,7 +319,7 @@ nombres_sexo <- c("hembra" = "Pistillate",
 # plot
 hongos_hill = ggplot(hill_wide_ic_its, aes(y = qD_q0, x = tratamiento, fill = tratamiento))+
   geom_boxplot(alpha = .8)+
-  #geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
+  geom_jitter(position = position_jitter(0.1), size = 1, alpha = .8)+
   facet_grid(sexo ~ condicion,
              labeller = labeller(
                condicion = nombres_condicion,
@@ -326,8 +335,9 @@ hongos_hill = ggplot(hill_wide_ic_its, aes(y = qD_q0, x = tratamiento, fill = tr
   theme_bw()+
   theme(legend.position = "none")
 
+hongos_hill
 
-# Unir las gráficas de bacterias y hongos
+# Unir la"vegan"# Unir las gráficas de bacterias y hongos
 # cargando paqueteria gridExtra
 library(gridExtra)
 library(cowplot)
@@ -1294,3 +1304,48 @@ write.csv(df_final_global, "abundancias_top10_global.csv")
 
 citation("ShortRead")
 citation("")
+###############################################################################
+# install microViz
+#remotes::install_github("david-barnett/microViz")
+library("microViz")
+library(phyloseq)
+library(ggplot2)
+library(patchwork) # for arranging groups of plots
+
+
+# Paquete microbiome
+# ITS2
+# Paquete microbiome
+transform <- microbiome::transform
+its_prop <- transform(its6, "compositional")
+otu_table(its_prop)[1:10, 1:10]
+head(sample_sums(its_prop))
+
+# gráfica modificada para hongos
+its_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  #facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+# Gráfica para hongos
+its_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+
+# ITS (fungi)
+transform <- microbiome::transform
+its_prop <- transform(its6, "compositional")
+otu_table(its_prop)[1:10, 1:10]
+head(sample_sums(its_prop))
+
+its_prop %>%
+  tax_fix(unknowns = c("Incertae Sedis")) %>%
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  coord_flip() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())

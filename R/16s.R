@@ -1511,10 +1511,10 @@ percentages <- transform_sample_counts(s16_6, function(x) x*100 / sum(x) )
 head(percentages@otu_table@.Data)
 
 
-percentages_glom <- tax_glom(percentages, taxrank = 'Family')
+percentages_glom <- tax_glom(percentages, taxrank = 'Genus')
 
 View(percentages_glom@tax_table@.Data)
-
+write.csv(percentages_glom@tax_table@.Data, "genus_taxtable.csv")
 
 percentages_df <- psmelt(percentages_glom)
 str(percentages_df)

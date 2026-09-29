@@ -894,7 +894,7 @@ ordination_wei_its = ordinate(ps_con_arbol_its,
 baseplot_wei_its <- plot_ordination(ps_con_arbol_its, 
                                     ordination_wei_its,
                                     color="tratamiento",
-                                    shape = "sexo",
+                                    #shape = "sexo",
                                     type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("")+
   theme(aspect.ratio=1)+
@@ -922,14 +922,19 @@ baseplot_wei_its <- plot_ordination(ps_con_arbol_its,
 #baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
 baseplot_wei_its
 pcoa_its = baseplot_wei_its + stat_ellipse(linetype = 2)
-pcoa_its
+pcoa_its +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    legend.key.size = unit(1, "cm")
+  )
 
 
 # El paquete ggpubr es para unir graficas en paneles
 library("ggpubr")
 # Uniendo plots de PCoA
-beta = ggarrange(baseplot_16s_wei, baseplot_wei_its,
-                 nrow = 2, labels = "AUTO",
+beta = ggarrange(pcoa_16s, pcoa_its,
+                 nrow = 1, labels = "AUTO",
                  common.legend = TRUE, legend = "bottom")
 
 beta
@@ -1335,9 +1340,13 @@ its_prop %>%
 # Gráfica para hongos
 its_prop %>%
   tax_fix(unknowns = c("Incertae Sedis")) %>%
-  comp_barplot(tax_level = "Family", n_taxa = 15, facet_by = "tratamiento")+
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  facet_wrap(~ tratamiento, scales = "free",
+             labeller = as_labeller(etiquetas))+ #, scales = "free"
   coord_flip() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        axis.title = element_text(size = 12, face = "bold"),
+        strip.text = element_text(size = 12, face = "bold"))
 
 
 # ITS (fungi)

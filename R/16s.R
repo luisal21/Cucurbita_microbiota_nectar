@@ -1003,7 +1003,12 @@ baseplot_16s_wei <- plot_ordination(ps_con_arbol,
 #baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
 baseplot_16s_wei
 pcoa_16s = baseplot_16s_wei + stat_ellipse(linetype = 2)
-pcoa_16s
+pcoa_16s +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    legend.key.size = unit(1, "cm")
+  )
 #
 #baseplot2 +
 #  geom_point(size = 1) +
@@ -1416,13 +1421,18 @@ s16_prop <- transform(s16_6, "compositional")
 otu_table(s16_prop)[1:10, 1:10]
 head(sample_sums(s16_prop))
 
+etiquetas = c("t1" = "Unvisited", "t2" = "Visited")
+
 # gráfica modificada para bacterias
 s16_prop %>%
   tax_fix(unknowns = c("Incertae Sedis")) %>%
-  comp_barplot(tax_level = "Family", n_taxa = 20)+
-  #facet_wrap(~ condicion + sexo + tratamiento, scales = "free")+ #, scales = "free"
+  comp_barplot(tax_level = "Family", n_taxa = 15)+
+  facet_wrap(~ tratamiento, scales = "free",
+             labeller = as_labeller(etiquetas))+ #, scales = "free"
   coord_flip() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        axis.title = element_text(size = 12, face = "bold"),
+        strip.text = element_text(size = 12, face = "bold"))
 
 # Gráfica para hongos
 its_prop %>%

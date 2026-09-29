@@ -248,7 +248,7 @@ hill_wide_ic_its <- coverage_incidence_its %>%
 colnames(hill_wide_ic_its)
 head(hill_wide_ic_its)
 View(hill_wide_ic_its)
-write.csv(hill_wide_ic_its, file = "Hillnumbers_its2.csv")
+#write.csv(hill_wide_ic_its, file = "Hillnumbers_its2.csv")
 
 # Paso 1: histogramas de Hill numbers
 hist(hill_wide_ic_its$qD_q0)
@@ -333,7 +333,10 @@ hongos_hill = ggplot(hill_wide_ic_its, aes(y = qD_q0, x = tratamiento, fill = tr
                                  "t2" = "Visited"),
                       palette = c("#E6AB02","#4D9221"))+
   theme_bw()+
-  theme(legend.position = "none")
+  theme(legend.position = "none", 
+        axis.text.x = element_text(size = 14, face = "bold"),
+        axis.title = element_text(size = 14, face = "bold"),
+        strip.text = element_text(size = 12, face = "bold"))
 
 hongos_hill
 

@@ -426,8 +426,11 @@ bacterias_hill = ggplot(hill_wide_ic, aes(y = qD_q0, x = tratamiento, fill = tra
                                "t2" = "Visited"),
                     palette = c("#E6AB02","#4D9221"))+
   theme_bw()+
-  theme(legend.position = "none")
-  
+  theme(legend.position = "none", 
+        axis.text.x = element_text(size = 14, face = "bold"),
+        axis.title = element_text(size = 14, face = "bold"),
+        strip.text = element_text(size = 12, face = "bold"))
+
 bacterias_hill
 
 # Gráfica de curvas de cobertura de muestra
@@ -972,7 +975,7 @@ ordination_16s_wei = ordinate(ps_con_arbol,
 baseplot_16s_wei <- plot_ordination(ps_con_arbol, 
                                     ordination_16s_wei,
                                     color="tratamiento",
-                                    shape = "sexo",
+                                    #shape = "sexo",
                                     type = "samples") + #shape = "sexo" shape = "tratamiento"
   ggtitle("")+
   theme(aspect.ratio=1)+

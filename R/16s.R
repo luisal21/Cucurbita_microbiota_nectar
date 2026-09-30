@@ -4352,6 +4352,8 @@ tapply(more2021$ID.planta, list(more2021$condicion, more2021$sexo), length)
 # Cargando librerias
 library(fossil)
 library (bipartite)
+library(dplyr)
+library(ggplot2)
 
 
 ### Horas totales de grabación entre 2021 y 2022: 106 horas
@@ -4379,12 +4381,13 @@ tapply(more2021$especie, more2021$Especie.planta, length)
 
 #
 visitas <- more2021 %>%
-  dplyr::group_by(condicion, sexo, especie) %>%
+  dplyr::group_by(condicion, Especie.planta, sexo, especie) %>%
   dplyr::summarize(num_visitas = length(especie))
 
+head(visitas)
 ## frecuencia de visitas
 frec <- more2021 %>%
-  dplyr::group_by(año, fecha, condicion, ID.planta, sexo, especie,
+  dplyr::group_by(año, fecha, condicion, Especie.planta, ID.planta, sexo, especie,
                   duración.decimal) %>%
   dplyr::summarize(num_visitas = n()) %>% 
   dplyr::mutate(
@@ -4437,6 +4440,8 @@ frec %>%
 modvis = glm(frecu ~ condicion * sexo,
     data = frec, family = Gamma(link = "log"))
 summary(modvis)
+
+library(car)
 Anova(modvis)
 
 modvis2 = glm(frecu ~ condicion * sexo * especie_agrupada,
@@ -4690,7 +4695,7 @@ ggplot(frec_summary_int,
 ##############################################################################
 ### Promediando la frecuencia de visita para la red
 frec2 <- frec %>%
-  dplyr::group_by(condicion, sexo, especie_agrupada) %>%
+  dplyr::group_by(condicion, Especie.planta, sexo, especie_agrupada) %>%
   dplyr::summarize(mean_frec = mean(frecu))
 frec2
 
@@ -4709,9 +4714,14 @@ ggplot(more2021, aes(condicion, fill = especie))+
   geom_bar(position = "fill")+
   facet_grid(.~ sexo)
 
+library(bipartite)
+library(fossil)
+library(tidyr)
 ### Realizando redes de interacción ###
 visitas2 = visitas %>%
-  unite("plant_sex", condicion:sexo)
+  unite("plant_sex", Especie.planta:sexo)
+visitas2
+
 df_vis <- create.matrix(as.data.frame(visitas2), tax.name = "especie",
                         locality = "plant_sex",
                         abund.col = "num_visitas",
@@ -4740,6 +4750,48 @@ plotweb(df1_vis,method="normal", y.lim=c(-1,2.5), labsize=1.2, text.rot=90,
 # frecuencia de visita
 plotweb(df1, sorting = "dec", higher_color = "#E6AB02",
         lower_color = "#4D9221")
+
+# Orden de nombres
+colnames(df1)
+rownames(df1)
+
+# renombrando etiquetas
+mapeo_especies <- c(
+  "Apis_mellifera"   = "Apis mellifera",
+  "Halictidae"       = "Halictidae",
+  "Other"            = "Otro",
+  "Peponapis_hembra" = "Xenoglossa (Peponapis) ♀",
+  "Peponapis_macho"  = "Xenoglossa (Peponapis) ♂",
+  "Xenoglossa"       = "Xenoglossa sp."
+)
+
+colnames(df1) <- mapeo_especies[colnames(df1)]
+
+mapeo_grupos <- c(
+  "domesticada_CAA_H" = "Domesticada CAA ♀",
+  "domesticada_CAA_M" = "Domesticada CAA ♂",
+  "domesticada_CM_H" = "Domesticada CM ♀",
+  "domesticada_CM_M" = "Domesticada CM ♂",
+  "domesticada_CPP_H" = "Domesticada CPP ♀",
+  "domesticada_CPP_M" = "Domesticada CPP ♂",
+  "silvestre_CAS_H" = "Silvestrre CAS ♀",
+  "silvestre_CAS_M"   = "Silvestre CAS ♂",
+  "silvestre_CPF_M"   = "Silvestre CPF ♂"
+)
+
+rownames(df1) <- mapeo_grupos[rownames(df1)]
+
+# Verificando cambio de nombres
+colnames(df1)
+rownames(df1)
+
+
+# frecuencia de visita
+plotweb(df1, sorting = "dec",
+        higher_color = "#964B00",
+        lower_color = c("#4D9221","#4D9221","#E6AB02","#E6AB02","#E6AB02",
+                        "#E6AB02","#E6AB02","#4D9221","#E6AB02"))
+
 
 
 ### Metricas básicas de la red

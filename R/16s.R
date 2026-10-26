@@ -971,7 +971,8 @@ permutest(disp_w2, permutations = 999)
 # PCoA plot using the weighted UniFrac as distance
 ordination_16s_wei = ordinate(ps_con_arbol,
                               method="PCoA", "wunifrac")
-# Plot
+
+### Plot separated by treatment
 baseplot_16s_wei <- plot_ordination(ps_con_arbol, 
                                     ordination_16s_wei,
                                     color="tratamiento",
@@ -1009,6 +1010,58 @@ pcoa_16s +
     legend.title = element_text(size = 14),
     legend.key.size = unit(1, "cm")
   )
+#
+#baseplot2 +
+#  geom_point(size = 1) +
+#  geom_label(aes(label = clave), size = 3.5, color = "black")
+#
+#wei_16s = baseplot_16s_hem_wei + stat_ellipse(type = "norm", linetype = 2)
+#wei_16s
+#+ coord_fixed()
+
+#+ stat_ellipse(type = "t")
+#baseplot_16s_hem_wei + stat_ellipse(type = "t")
+
+### Plot separated by condition
+baseplot_16s_wei <- plot_ordination(ps_con_arbol, 
+                                    ordination_16s_wei,
+                                    color="condicion",
+                                    #shape = "sexo",
+                                    type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "Condition",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"),
+                       palette = c("#E6AB02","#4D9221"))
+
+baseplot_16s_wei
+pcoa_16s = baseplot_16s_wei + stat_ellipse(linetype = 2)
+pcoa_16s +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    legend.key.size = unit(1, "cm")
+  )
+
+#scale_shape_manual(values=c(16,3))
+#labs(x = "PCoa1 (31.3%)", y = "PCoA2 (10.4%)")+
+#scale_color_discrete(name = "Condition", 
+#                    labels = c("Domesticated","Wild"))+
+#scale_color_discrete(name = "Treatment",
+#                     labels = c("No-visited","Visited"))
+
+  
+#scale_color_discrete(name = "Species", 
+#                    labels = c("2CPF" = "CPF","3CAS" = "CAS",
+#                              "4CPP"="CPP", "5CAA"="CAA", "6CM"="CM"),
+#        palette = "Set1")+
+
+
+#baseplot_16s_wei
+#baseplot_16s_hem_wei + geom_polygon(aes(fill = especies))
 #
 #baseplot2 +
 #  geom_point(size = 1) +

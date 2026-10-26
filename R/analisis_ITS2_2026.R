@@ -929,6 +929,30 @@ pcoa_its +
     legend.key.size = unit(1, "cm")
   )
 
+## Plot por condición
+baseplot_wei_its <- plot_ordination(ps_con_arbol_its, 
+                                    ordination_wei_its,
+                                    color="condicion",
+                                    #shape = "sexo",
+                                    type = "samples") + #shape = "sexo" shape = "tratamiento"
+  ggtitle("")+
+  theme(aspect.ratio=1)+
+  theme_bw()+
+  geom_point(size = 4)+
+  scale_color_discrete(name = "condicion",
+                       labels = c("domesticada" = "Domesticated",
+                                  "silvestre" = "Wild"),
+                       palette = c("#E6AB02","#4D9221"))
+
+baseplot_wei_its
+pcoa_its = baseplot_wei_its + stat_ellipse(linetype = 2)
+pcoa_its +
+  theme(
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    legend.key.size = unit(1, "cm")
+  )
+
 
 # El paquete ggpubr es para unir graficas en paneles
 library("ggpubr")

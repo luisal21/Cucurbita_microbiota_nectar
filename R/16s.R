@@ -323,6 +323,33 @@ coverage_incidence <- estimateD(asv_table,
 coverage_incidence
 unique(coverage_incidence$SC)
 View(coverage_incidence)
+coverage_incidence$qD[1]
+
+range(coverage_incidence$SC)
+table(coverage_incidence$Method)
+
+out <- iNEXT(asv_table, q = 0, datatype = "abundance")
+sc_obs <- out$DataInfo$SC
+summary(sc_obs)
+quantile(sc_obs, c(0.05, 0.1, 0.25, 0.5))
+out$DataInfo[, c("Assemblage", "n", "S.obs", "f1", "f2")]
+
+hist(out$DataInfo$n, breaks = 40)
+quantile(out$DataInfo$n, c(0.1, 0.25, 0.5, 0.75))
+sum(out$DataInfo$n < 100)
+sum(out$DataInfo$n < 50)
+
+
+library(dplyr)
+
+metadata |>
+  mutate(lecturas = out$DataInfo$n[match(sampleid2, out$DataInfo$Assemblage)]) |>
+  filter(lecturas >= 100) |>
+  count(condicion, sexo, tratamiento)
+
+subset(coverage_incidence, Order.q == 0)
+q0 <- subset(coverage_incidence, Order.q == 0)$qD
+all(q0 == round(q0))
 
 head(metadata)
 # Uniendo tabla de estimateD con metadatos
@@ -385,6 +412,33 @@ library(car)
 Anova(modnb_q0)
 Anova(mod_q1)
 Anova(mod_q2)
+
+# Modelo lineales mixtos con la especie como factor aleatorio
+library(glmmTMB)
+library(DHARMa)
+library(emmeans)
+
+m_q0 <- glmmTMB(qD_q0 ~ condicion * sexo * tratamiento + (1 | especies),
+                family = Gamma(link = "log"),
+                data = hill_wide_ic)
+# Binomial negativa
+m_final_nb <- glmmTMB(qD_q0 ~ condicion * sexo + tratamiento + (1 | especies),
+                      family = nbinom2(link = "log"),
+                      data = hill_wide_ic)
+
+
+m_q0
+summary(m_q0)
+car::Anova(m_q0, type = "II") 
+drop1(m_q0, test = "Chisq")
+m_2vias <- update(m_q0, . ~ . - condicion:sexo:tratamiento)
+drop1(m_2vias, test = "Chisq")
+summary(m_q0)$varcor
+
+simulateResiduals(m_q0) |> plot()
+emmeans(m_q0, ~ condicion | sexo, type = "response")
+emmeans(m_q0, ~ condicion | sexo, type = "response") |> pairs()
+emmip(m_q0, condicion ~ sexo, type = "response", CIs = TRUE)
 
 # Summary
 #q0

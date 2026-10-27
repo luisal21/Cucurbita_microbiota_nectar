@@ -314,6 +314,77 @@ coverage_incidence_con <- estimateD(asv_por_condicion,
 coverage_incidence_con
 unique(coverage_incidence_con$SC)
 
+
+## Aplicando rarefied subsampling to samples
+library(phyloseq)
+
+set.seed(123)
+n_iter <- 1000   # 10,000 si el tiempo lo permite
+depth  <- 100
+
+riquezas <- replicate(n_iter, {
+  ps_r <- rarefy_even_depth(s16_6, sample.size = depth,
+                            rngseed = FALSE, replace = TRUE,
+                            verbose = FALSE)
+  estimate_richness(ps_r, measures = "Observed")$Observed
+})
+
+riqueza_media <- rowMeans(riquezas)
+riqueza_sd    <- apply(riquezas, 1, sd)
+
+# Verificando  correlación con 200 repeticiones
+library(phyloseq)
+set.seed(123)
+n_iter <- 200   # suficiente para esta verificación; sube después
+
+for (d in c(50, 100)) {
+  ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)
+  
+  res <- replicate(n_iter, {
+    ps_r <- rarefy_even_depth(ps_f, sample.size = d, rngseed = FALSE,
+                              replace = TRUE, trimOTUs = FALSE, verbose = FALSE)
+    m <- as(otu_table(ps_r), "matrix")
+    if (!taxa_are_rows(ps_r)) m <- t(m)
+    colSums(m > 0)
+  })
+  
+  riqueza_media <- rowMeans(res)
+  prof <- sample_sums(ps_f)[names(riqueza_media)]   # alinear por nombre
+  
+  cat("\n--- umbral", d, "| n =", length(riqueza_media), "---\n")
+  print(cor.test(log(prof), riqueza_media, method = "spearman"))
+}
+
+riqueza_cruda <- estimate_richness(s16_6, measures = "Observed")$Observed
+cor.test(log(sample_sums(s16_6)), riqueza_cruda, method = "spearman")
+
+sum(taxa_sums(s16_6) == 1)        # ASVs con una sola lectura en todo el dataset
+sum(otu_table(s16_6) == 1)        # celdas con valor 1
+
+
+
+
+
+
+for (d in c(50, 100)) {
+  ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)
+  # ... bucle de rarefacción a profundidad d ...
+  print(cor.test(log(sample_sums(ps_f)), riqueza_media, method = "spearman"))
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Estimando los numeros de Hill con la función estimateD por cobertura
 coverage_incidence <- estimateD(asv_table,
                                 q = c(0, 1, 2),
@@ -344,12 +415,21 @@ library(dplyr)
 
 metadata |>
   mutate(lecturas = out$DataInfo$n[match(sampleid2, out$DataInfo$Assemblage)]) |>
-  filter(lecturas >= 100) |>
+  filter(lecturas >= 50) |>
   count(condicion, sexo, tratamiento)
 
 subset(coverage_incidence, Order.q == 0)
 q0 <- subset(coverage_incidence, Order.q == 0)$qD
 all(q0 == round(q0))
+
+
+
+
+
+
+
+
+
 
 head(metadata)
 # Uniendo tabla de estimateD con metadatos

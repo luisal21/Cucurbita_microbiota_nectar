@@ -315,27 +315,181 @@ coverage_incidence_con
 unique(coverage_incidence_con$SC)
 
 
+# Obteniendo la grafica de rarefacción
+library(vegan)
+
+# Extraer la tabla de OTUs/ASVs (transpuesta: filas = muestras, columnas = taxones)
+OTU_mat <- as(otu_table(s16_6), "matrix")
+if (taxa_are_rows(s16_6)) {
+  OTU_mat <- t(OTU_mat)
+}
+
+# Generar la curva base
+rarecurve(
+  OTU_mat, 
+  step = 100,
+  col = "blue", 
+  cex = 0.6, 
+  xlab = "Número de lecturas", 
+  ylab = "ASVs observados",
+  label = FALSE
+)
+abline(v = 50, col = "black", lty = 3)
+
+
+
 ## Aplicando rarefied subsampling to samples
+library(ggplot2)
 library(phyloseq)
-
 set.seed(123)
-n_iter <- 1000   # 10,000 si el tiempo lo permite
-depth  <- 100
 
-riquezas <- replicate(n_iter, {
-  ps_r <- rarefy_even_depth(s16_6, sample.size = depth,
-                            rngseed = FALSE, replace = TRUE,
-                            verbose = FALSE)
-  estimate_richness(ps_r, measures = "Observed")$Observed
+d       <- 50
+n_iter  <- 1000
+
+ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)
+
+res <- replicate(n_iter, {
+  ps_r <- rarefy_even_depth(ps_f, sample.size = d, rngseed = FALSE,
+                            replace = TRUE, trimOTUs = FALSE, verbose = FALSE)
+  m <- as(otu_table(ps_r), "matrix")
+  if (!taxa_are_rows(ps_r)) m <- t(m)
+  colSums(m > 0)
 })
 
-riqueza_media <- rowMeans(riquezas)
-riqueza_sd    <- apply(riquezas, 1, sd)
+df <- data.frame(
+  muestra  = rownames(res),
+  prof     = as.numeric(sample_sums(ps_f)[rownames(res)]),
+  q0_rare  = rowMeans(res),
+  q0_sd    = apply(res, 1, sd),
+  q0_cruda = as.numeric(colSums(otu_table(ps_f) > 0)[rownames(res)])
+)
+df$condicion <- metadata$condicion[match(df$muestra, metadata$sampleid2)]
 
-# Verificando  correlación con 200 repeticiones
+rho <- cor(log(df$prof), df$q0_rare, method = "spearman")
+
+ggplot(df, aes(prof, q0_rare)) +
+  geom_point(aes(colour = condicion), size = 2, alpha = 0.7) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "grey30",
+              linewidth = 0.6, se = TRUE) +
+  scale_x_log10() +
+  annotate("text", x = min(df$prof), y = max(df$q0_rare),
+           hjust = 0, vjust = 1,
+           label = sprintf("rho == %.2f", rho), parse = TRUE) +
+  labs(x = "Lecturas originales (escala log)",
+       y = sprintf("Riqueza rarificada a %d lecturas", d),
+       colour = NULL) +
+  theme_bw()
+
+
+library(tidyr)
+
+df_long <- pivot_longer(df, c(q0_cruda, q0_rare),
+                        names_to = "tipo", values_to = "riqueza")
+df_long$tipo <- factor(df_long$tipo, levels = c("q0_cruda", "q0_rare"),
+                       labels = c("Riqueza observada", "Riqueza rarificada"))
+
+ggplot(df_long, aes(prof, riqueza)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", colour = "grey30", linewidth = 0.6) +
+  scale_x_log10() +
+  facet_wrap(~ tipo, scales = "free_y") +
+  labs(x = "Lecturas originales (escala log)", y = "ASVs", colour = NULL) +
+  theme_bw()
+
+
+### Normalize library size to 100 reads
+set.seed(123)
+ps.rarefied100 <- rarefy_even_depth(s16_6, sample.size = 100, 
+                                    rngseed = FALSE,
+                                    replace = FALSE, verbose = FALSE)
+
+ps.rarefied100
+
+### Normalize library size to 50 reads
+set.seed(123)
+ps.rarefied50 <- rarefy_even_depth(s16_6, sample.size = 50, 
+                                    rngseed = FALSE,
+                                    replace = FALSE, verbose = FALSE)
+
+ps.rarefied50
+
+# Correlación entre el numero de ASVs y la profundidad
+# Correlación con datos crudos
+riqueza <- colSums(otu_table(s16_6) > 0)
+prof_orig    <- sample_sums(s16_6)[names(riqueza)]
+cor.test(log(prof_orig), riqueza, method = "spearman")
+
+# Correlación con datos rarefied a 100 reads por muestra
+riqueza_r100 <- colSums(otu_table(ps.rarefied100) > 0)
+prof_orig    <- sample_sums(s16_6)[names(riqueza_r100)]
+cor.test(log(prof_orig), riqueza_r100, method = "spearman")
+
+# Correlación con datos rarefied a 50 reads por muestra
+riqueza_r50 <- colSums(otu_table(ps.rarefied50) > 0)
+prof_orig_r50    <- sample_sums(s16_6)[names(riqueza_r50)]
+cor.test(log(prof_orig_r50), riqueza_r50, method = "spearman")
+
+# Graficando correlaciones
+library(ggplot2)
+library(dplyr)
+
+# --- armar un data frame largo con los tres escenarios ---
+dat <- bind_rows(
+  tibble(muestra = names(riqueza),
+         prof    = as.numeric(sample_sums(s16_6)[names(riqueza)]),
+         riqueza = as.numeric(riqueza),
+         escenario = "Sin rarificar"),
+  tibble(muestra = names(riqueza_r50),
+         prof    = as.numeric(sample_sums(s16_6)[names(riqueza_r50)]),
+         riqueza = as.numeric(riqueza_r50),
+         escenario = "Rarificado a 50"),
+  tibble(muestra = names(riqueza_r100),
+         prof    = as.numeric(sample_sums(s16_6)[names(riqueza_r100)]),
+         riqueza = as.numeric(riqueza_r100),
+         escenario = "Rarificado a 100")
+) |>
+  mutate(
+    escenario = factor(escenario,
+                       levels = c("Sin rarificar", "Rarificado a 50",
+                                  "Rarificado a 100")),
+    condicion = metadata$condicion[match(muestra, metadata$sampleid2)]
+  )
+
+# --- etiquetas con rho y n por panel ---
+etiquetas <- dat |>
+  group_by(escenario) |>
+  summarise(
+    rho = cor(log(prof), riqueza, method = "spearman"),
+    n   = n(),
+    x   = min(prof),
+    y   = max(riqueza),
+    .groups = "drop"
+  ) |>
+  mutate(txt = sprintf("rho = %.2f\nn = %d", rho, n))
+
+# --- figura ---
+ggplot(dat, aes(prof, riqueza)) +
+  geom_point(aes(colour = condicion), alpha = 0.7, size = 1.8) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              colour = "grey25", linewidth = 0.6, se = TRUE) +
+  geom_text(data = etiquetas, aes(x = x, y = y, label = txt),
+            hjust = 0, vjust = 1, size = 3.4, inherit.aes = FALSE) +
+  scale_x_log10() +
+  scale_colour_manual(values = c("domesticada" = "#3B7EA1",
+                                 "silvestre"   = "#E8552D")) +
+  facet_wrap(~ escenario, nrow = 1) +
+  labs(x = "Profundidad original (lecturas, escala log)",
+       y = "ASVs observados",
+       colour = NULL) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "grey95"))
+
+
+# Verificando  correlación con 10000 repeticiones
 library(phyloseq)
 set.seed(123)
-n_iter <- 200   # suficiente para esta verificación; sube después
+n_iter <- 10000   # suficiente para esta verificación; sube después
 
 for (d in c(50, 100)) {
   ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)

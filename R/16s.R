@@ -254,8 +254,139 @@ data.frame(
 
 ###############################################################################
 ###############################################################################
-### ANÁLISIS DE NÚMEROS DE HILL
+### Analysis of alpha diversity calculating Hill numbers
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# First, we rarefied at 50 and 100 reads to normalize depth and plot 
+# correlation between original depth and ASVs observed to define the best
+# depth
+
+### Normalize library size to 50 reads
+set.seed(123)
+ps.rarefied50 <- rarefy_even_depth(s16_6, sample.size = 50, 
+                                   rngseed = FALSE,
+                                   replace = FALSE, verbose = FALSE)
+ps.rarefied50
+
+### Normalize library size to 100 reads
+set.seed(123)
+ps.rarefied100 <- rarefy_even_depth(s16_6, sample.size = 100, 
+                                    rngseed = FALSE,
+                                    replace = FALSE, verbose = FALSE)
+ps.rarefied100
+
+# Correlación entre el numero de ASVs y la profundidad
+# Correlación con datos crudos
+riqueza <- colSums(otu_table(s16_6) > 0)
+prof_orig    <- sample_sums(s16_6)[names(riqueza)]
+cor.test(log(prof_orig), riqueza, method = "spearman")
+
+# Correlación con datos rarefied a 100 reads por muestra
+riqueza_r100 <- colSums(otu_table(ps.rarefied100) > 0)
+prof_orig    <- sample_sums(s16_6)[names(riqueza_r100)]
+cor.test(log(prof_orig), riqueza_r100, method = "spearman")
+
+# Correlación con datos rarefied a 50 reads por muestra
+riqueza_r50 <- colSums(otu_table(ps.rarefied50) > 0)
+prof_orig_r50    <- sample_sums(s16_6)[names(riqueza_r50)]
+cor.test(log(prof_orig_r50), riqueza_r50, method = "spearman")
+
+# Graficando correlaciones
+library(ggplot2)
+library(dplyr)
+
+# --- armar un data frame largo con los tres escenarios ---
+dat <- bind_rows(
+  tibble(muestra = names(riqueza),
+         prof    = as.numeric(sample_sums(s16_6)[names(riqueza)]),
+         riqueza = as.numeric(riqueza),
+         escenario = "Without rarefaction"),
+  tibble(muestra = names(riqueza_r50),
+         prof    = as.numeric(sample_sums(s16_6)[names(riqueza_r50)]),
+         riqueza = as.numeric(riqueza_r50),
+         escenario = "Rarefied at 50"),
+  tibble(muestra = names(riqueza_r100),
+         prof    = as.numeric(sample_sums(s16_6)[names(riqueza_r100)]),
+         riqueza = as.numeric(riqueza_r100),
+         escenario = "Rarefied at 100")
+) |>
+  mutate(
+    escenario = factor(escenario,
+                       levels = c("Without rarefaction", "Rarefied at 50",
+                                  "Rarefied at 100")),
+    condicion = metadata$condicion[match(muestra, metadata$sampleid2)]
+  )
+
+# --- etiquetas con rho y n por panel ---
+etiquetas <- dat |>
+  group_by(escenario) |>
+  summarise(
+    rho = cor(log(prof), riqueza, method = "spearman"),
+    n   = n(),
+    x   = min(prof),
+    y   = max(riqueza),
+    .groups = "drop"
+  ) |>
+  mutate(txt = sprintf("rho = %.2f\nn = %d", rho, n))
+
+# --- figura ---
+ggplot(dat, aes(prof, riqueza)) +
+  geom_point(alpha = 0.7, size = 1.8) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              colour = "grey25", linewidth = 0.6, se = TRUE) +
+  geom_text(data = etiquetas, aes(x = x, y = y, label = txt),
+            hjust = 0, vjust = 1, size = 3.4, inherit.aes = FALSE) +
+  scale_x_log10() +
+  #scale_colour_manual(values = c("domesticada" = "#3B7EA1",
+  #                              "silvestre"   = "#E8552D")) +
+  facet_wrap(~ escenario, nrow = 1, scale = "free") +
+  labs(x = "Original depth (reads, log scale)",
+       y = "ASVs observed",
+       colour = NULL) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "grey95"))
+
+# Obteniendo la grafica de rarefacción
+library(vegan)
+
+# Extraer la tabla de OTUs/ASVs (transpuesta: filas = muestras, columnas = taxones)
+OTU_mat <- as(otu_table(s16_6), "matrix")
+if (taxa_are_rows(s16_6)) {
+  OTU_mat <- t(OTU_mat)
+}
+
+# Generar la curva base
+rarecurve(
+  OTU_mat, 
+  step = 100,
+  col = "blue", 
+  cex = 0.6, 
+  xlab = "Número de lecturas", 
+  ylab = "ASVs observados",
+  label = FALSE
+)
+
+
+###########  Hill numbers
 #install.packages("iNEXT")       # rarefacción y extrapolación
 #install.packages("hillR")       # Hill a partir de phyloseq
 #library(hillR)
@@ -266,8 +397,8 @@ library(iNEXT)
 library(phyloseq)
 
 # Extraer tabla de ASVs y metadatos del objeto phyloseq
-asv_table <- as.data.frame(otu_table(s16_6))# ASVs en filas, muestras en columnas
-metadata <- as.data.frame(as.matrix(sample_data(s16_6)))
+asv_table <- as.data.frame(otu_table(ps.rarefied100))# ASVs en filas, muestras en columnas
+metadata <- as.data.frame(as.matrix(sample_data(ps.rarefied100)))
 
 # Ver los niveles de condición
 unique(metadata$condicion)
@@ -315,230 +446,6 @@ coverage_incidence_con
 unique(coverage_incidence_con$SC)
 
 
-# Obteniendo la grafica de rarefacción
-library(vegan)
-
-# Extraer la tabla de OTUs/ASVs (transpuesta: filas = muestras, columnas = taxones)
-OTU_mat <- as(otu_table(s16_6), "matrix")
-if (taxa_are_rows(s16_6)) {
-  OTU_mat <- t(OTU_mat)
-}
-
-# Generar la curva base
-rarecurve(
-  OTU_mat, 
-  step = 100,
-  col = "blue", 
-  cex = 0.6, 
-  xlab = "Número de lecturas", 
-  ylab = "ASVs observados",
-  label = FALSE
-)
-abline(v = 50, col = "black", lty = 3)
-
-
-
-## Aplicando rarefied subsampling to samples
-library(ggplot2)
-library(phyloseq)
-set.seed(123)
-
-d       <- 50
-n_iter  <- 1000
-
-ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)
-
-res <- replicate(n_iter, {
-  ps_r <- rarefy_even_depth(ps_f, sample.size = d, rngseed = FALSE,
-                            replace = TRUE, trimOTUs = FALSE, verbose = FALSE)
-  m <- as(otu_table(ps_r), "matrix")
-  if (!taxa_are_rows(ps_r)) m <- t(m)
-  colSums(m > 0)
-})
-
-df <- data.frame(
-  muestra  = rownames(res),
-  prof     = as.numeric(sample_sums(ps_f)[rownames(res)]),
-  q0_rare  = rowMeans(res),
-  q0_sd    = apply(res, 1, sd),
-  q0_cruda = as.numeric(colSums(otu_table(ps_f) > 0)[rownames(res)])
-)
-df$condicion <- metadata$condicion[match(df$muestra, metadata$sampleid2)]
-
-rho <- cor(log(df$prof), df$q0_rare, method = "spearman")
-
-ggplot(df, aes(prof, q0_rare)) +
-  geom_point(aes(colour = condicion), size = 2, alpha = 0.7) +
-  geom_smooth(method = "lm", formula = y ~ x, colour = "grey30",
-              linewidth = 0.6, se = TRUE) +
-  scale_x_log10() +
-  annotate("text", x = min(df$prof), y = max(df$q0_rare),
-           hjust = 0, vjust = 1,
-           label = sprintf("rho == %.2f", rho), parse = TRUE) +
-  labs(x = "Lecturas originales (escala log)",
-       y = sprintf("Riqueza rarificada a %d lecturas", d),
-       colour = NULL) +
-  theme_bw()
-
-
-library(tidyr)
-
-df_long <- pivot_longer(df, c(q0_cruda, q0_rare),
-                        names_to = "tipo", values_to = "riqueza")
-df_long$tipo <- factor(df_long$tipo, levels = c("q0_cruda", "q0_rare"),
-                       labels = c("Riqueza observada", "Riqueza rarificada"))
-
-ggplot(df_long, aes(prof, riqueza)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(method = "lm", colour = "grey30", linewidth = 0.6) +
-  scale_x_log10() +
-  facet_wrap(~ tipo, scales = "free_y") +
-  labs(x = "Lecturas originales (escala log)", y = "ASVs", colour = NULL) +
-  theme_bw()
-
-
-### Normalize library size to 100 reads
-set.seed(123)
-ps.rarefied100 <- rarefy_even_depth(s16_6, sample.size = 100, 
-                                    rngseed = FALSE,
-                                    replace = FALSE, verbose = FALSE)
-
-ps.rarefied100
-
-### Normalize library size to 50 reads
-set.seed(123)
-ps.rarefied50 <- rarefy_even_depth(s16_6, sample.size = 50, 
-                                    rngseed = FALSE,
-                                    replace = FALSE, verbose = FALSE)
-
-ps.rarefied50
-
-# Correlación entre el numero de ASVs y la profundidad
-# Correlación con datos crudos
-riqueza <- colSums(otu_table(s16_6) > 0)
-prof_orig    <- sample_sums(s16_6)[names(riqueza)]
-cor.test(log(prof_orig), riqueza, method = "spearman")
-
-# Correlación con datos rarefied a 100 reads por muestra
-riqueza_r100 <- colSums(otu_table(ps.rarefied100) > 0)
-prof_orig    <- sample_sums(s16_6)[names(riqueza_r100)]
-cor.test(log(prof_orig), riqueza_r100, method = "spearman")
-
-# Correlación con datos rarefied a 50 reads por muestra
-riqueza_r50 <- colSums(otu_table(ps.rarefied50) > 0)
-prof_orig_r50    <- sample_sums(s16_6)[names(riqueza_r50)]
-cor.test(log(prof_orig_r50), riqueza_r50, method = "spearman")
-
-# Graficando correlaciones
-library(ggplot2)
-library(dplyr)
-
-# --- armar un data frame largo con los tres escenarios ---
-dat <- bind_rows(
-  tibble(muestra = names(riqueza),
-         prof    = as.numeric(sample_sums(s16_6)[names(riqueza)]),
-         riqueza = as.numeric(riqueza),
-         escenario = "Sin rarificar"),
-  tibble(muestra = names(riqueza_r50),
-         prof    = as.numeric(sample_sums(s16_6)[names(riqueza_r50)]),
-         riqueza = as.numeric(riqueza_r50),
-         escenario = "Rarificado a 50"),
-  tibble(muestra = names(riqueza_r100),
-         prof    = as.numeric(sample_sums(s16_6)[names(riqueza_r100)]),
-         riqueza = as.numeric(riqueza_r100),
-         escenario = "Rarificado a 100")
-) |>
-  mutate(
-    escenario = factor(escenario,
-                       levels = c("Sin rarificar", "Rarificado a 50",
-                                  "Rarificado a 100")),
-    condicion = metadata$condicion[match(muestra, metadata$sampleid2)]
-  )
-
-# --- etiquetas con rho y n por panel ---
-etiquetas <- dat |>
-  group_by(escenario) |>
-  summarise(
-    rho = cor(log(prof), riqueza, method = "spearman"),
-    n   = n(),
-    x   = min(prof),
-    y   = max(riqueza),
-    .groups = "drop"
-  ) |>
-  mutate(txt = sprintf("rho = %.2f\nn = %d", rho, n))
-
-# --- figura ---
-ggplot(dat, aes(prof, riqueza)) +
-  geom_point(aes(colour = condicion), alpha = 0.7, size = 1.8) +
-  geom_smooth(method = "lm", formula = y ~ x,
-              colour = "grey25", linewidth = 0.6, se = TRUE) +
-  geom_text(data = etiquetas, aes(x = x, y = y, label = txt),
-            hjust = 0, vjust = 1, size = 3.4, inherit.aes = FALSE) +
-  scale_x_log10() +
-  scale_colour_manual(values = c("domesticada" = "#3B7EA1",
-                                 "silvestre"   = "#E8552D")) +
-  facet_wrap(~ escenario, nrow = 1) +
-  labs(x = "Profundidad original (lecturas, escala log)",
-       y = "ASVs observados",
-       colour = NULL) +
-  theme_bw() +
-  theme(legend.position = "bottom",
-        strip.background = element_rect(fill = "grey95"))
-
-
-# Verificando  correlación con 10000 repeticiones
-library(phyloseq)
-set.seed(123)
-n_iter <- 10000   # suficiente para esta verificación; sube después
-
-for (d in c(50, 100)) {
-  ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)
-  
-  res <- replicate(n_iter, {
-    ps_r <- rarefy_even_depth(ps_f, sample.size = d, rngseed = FALSE,
-                              replace = TRUE, trimOTUs = FALSE, verbose = FALSE)
-    m <- as(otu_table(ps_r), "matrix")
-    if (!taxa_are_rows(ps_r)) m <- t(m)
-    colSums(m > 0)
-  })
-  
-  riqueza_media <- rowMeans(res)
-  prof <- sample_sums(ps_f)[names(riqueza_media)]   # alinear por nombre
-  
-  cat("\n--- umbral", d, "| n =", length(riqueza_media), "---\n")
-  print(cor.test(log(prof), riqueza_media, method = "spearman"))
-}
-
-riqueza_cruda <- estimate_richness(s16_6, measures = "Observed")$Observed
-cor.test(log(sample_sums(s16_6)), riqueza_cruda, method = "spearman")
-
-sum(taxa_sums(s16_6) == 1)        # ASVs con una sola lectura en todo el dataset
-sum(otu_table(s16_6) == 1)        # celdas con valor 1
-
-
-
-
-
-
-for (d in c(50, 100)) {
-  ps_f <- prune_samples(sample_sums(s16_6) >= d, s16_6)
-  # ... bucle de rarefacción a profundidad d ...
-  print(cor.test(log(sample_sums(ps_f)), riqueza_media, method = "spearman"))
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ### Estimando los numeros de Hill con la función estimateD por cobertura
 coverage_incidence <- estimateD(asv_table,
                                 q = c(0, 1, 2),
@@ -553,45 +460,11 @@ coverage_incidence$qD[1]
 range(coverage_incidence$SC)
 table(coverage_incidence$Method)
 
-out <- iNEXT(asv_table, q = 0, datatype = "abundance")
-sc_obs <- out$DataInfo$SC
-summary(sc_obs)
-quantile(sc_obs, c(0.05, 0.1, 0.25, 0.5))
-out$DataInfo[, c("Assemblage", "n", "S.obs", "f1", "f2")]
-
-hist(out$DataInfo$n, breaks = 40)
-quantile(out$DataInfo$n, c(0.1, 0.25, 0.5, 0.75))
-sum(out$DataInfo$n < 100)
-sum(out$DataInfo$n < 50)
-
-
-library(dplyr)
-
-metadata |>
-  mutate(lecturas = out$DataInfo$n[match(sampleid2, out$DataInfo$Assemblage)]) |>
-  filter(lecturas >= 50) |>
-  count(condicion, sexo, tratamiento)
-
-subset(coverage_incidence, Order.q == 0)
-q0 <- subset(coverage_incidence, Order.q == 0)$qD
-all(q0 == round(q0))
-
-
-
-
-
-
-
-
-
-
-head(metadata)
 # Uniendo tabla de estimateD con metadatos
 library(dplyr)
 library(tidyr)
 # Uniendo tablas
 hill_wide_ic <- coverage_incidence %>%
-  filter(Method == "Observed") %>%
   dplyr::select(Assemblage, Order.q, qD, qD.LCL, qD.UCL) %>%
   pivot_wider(names_from  = Order.q,
               values_from = c(qD, qD.LCL, qD.UCL),
@@ -616,19 +489,9 @@ shapiro.test(hill_wide_ic$qD_q2)
 # Paso 2: Análisis estadístico con tus variables
 # Para cada orden de Hill
 # Modelo con q0
-mod_q0 <- glm(qD_q0 ~ condicion * sexo * tratamiento, 
-              data = hill_wide_ic,
-              family = poisson())
-summary(mod_q0)
-# Calcular ratio de dispersión (debe ser ~1 si no hay sobredispersión)
-E2 <- resid(mod_q0, type = "pearson")
-sum(E2^2) / df.residual(mod_q0)
-# Modelo con q0 binomial negativo
-library(MASS)
-# q0 modelo bueno
-modnb_q0 <- glm.nb(qD_q0 ~ condicion * sexo * tratamiento, 
+modnb_q0 <- glm(qD_q0 ~ condicion * sexo * tratamiento, 
                  data = hill_wide_ic,
-                 link = "log")
+                 family = Gamma(link = "log"))
 summary(modnb_q0)
 # Modelo con q1
 mod_q1 <- glm(qD_q1 ~ condicion * sexo * tratamiento, 
@@ -646,33 +509,6 @@ library(car)
 Anova(modnb_q0)
 Anova(mod_q1)
 Anova(mod_q2)
-
-# Modelo lineales mixtos con la especie como factor aleatorio
-library(glmmTMB)
-library(DHARMa)
-library(emmeans)
-
-m_q0 <- glmmTMB(qD_q0 ~ condicion * sexo * tratamiento + (1 | especies),
-                family = Gamma(link = "log"),
-                data = hill_wide_ic)
-# Binomial negativa
-m_final_nb <- glmmTMB(qD_q0 ~ condicion * sexo + tratamiento + (1 | especies),
-                      family = nbinom2(link = "log"),
-                      data = hill_wide_ic)
-
-
-m_q0
-summary(m_q0)
-car::Anova(m_q0, type = "II") 
-drop1(m_q0, test = "Chisq")
-m_2vias <- update(m_q0, . ~ . - condicion:sexo:tratamiento)
-drop1(m_2vias, test = "Chisq")
-summary(m_q0)$varcor
-
-simulateResiduals(m_q0) |> plot()
-emmeans(m_q0, ~ condicion | sexo, type = "response")
-emmeans(m_q0, ~ condicion | sexo, type = "response") |> pairs()
-emmip(m_q0, condicion ~ sexo, type = "response", CIs = TRUE)
 
 # Summary
 #q0
@@ -1157,7 +993,7 @@ ggplot(hill_valores, aes(x = Assemblage, y = qD)) +
 ###############################################################################
 ################ BETA DIVERSITY OF BACTERIA
 #BiocManager::install("DECIPHER")
-
+  
 # Cargando paquetes
 library(DECIPHER)
 library(phangorn)

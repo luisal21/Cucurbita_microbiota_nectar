@@ -1,128 +1,109 @@
-################### Análisis de las secuencias de 16s #########################
+############## Taxonomic and diversity analysis with R of 16s ##################
 ##### Luis Alberto Villanueva Espino
-#### Marzo 2026
+#### November 2026
 
-
-#if (!require("BiocManager", quietly = TRUE))
-#  install.packages("BiocManager")
-
-#BiocManager::install("phyloseq")
-#BiocManager::install("microbiome")
-
-#### Cargando paquete phyloseq y paquetes adicionales ####
+#### Loading packages ####
 library(phyloseq)
 library(ggplot2)
-#library(VennDiagram) # no instalado
 library(picante)
 library(ape)
 library("microbiome")
 library("dplyr")
-#library("hrbrthemes") # no instalado
-#library("gcookbook") # no instalado
-#library("tidyverse")
 library("RColorBrewer")
 library("ggpubr")
-#library("breakaway") # no instalado
-#library(MicrobiotaProcess)
-#library(reltools)
-library(microbiomeutilities)
 library(vegan)
 library(gridExtra)
 library(tidyr)
 library(reshape2)
-#library(UpSetR) # no instalado
-#library(minpack.lm) # no instalado
 library(Hmisc)
 library(stats4)
-#library(patchwork) # no instalado
 
 #### Set up directory in which the databases are located ####
-setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_16s")
 
-### Primero transponer la tabla original "seqtab_nochim_16s_2024.csv, despues
-# deshabilitar este codigo
-### Transponer tabla de ASV
+### First, import the original table "seqtab_nochim_16s_2024.csv, then
+# transpose the table. NOTE: Disable this code at the end
 #asvtable <- read.csv("seqtab_nochim_16s_2024.csv", header = T, row.names = 1)
 #head(asvtable, 1)
 #asv2 = t(asvtable)
 #head(asv2, 1)
 #write.csv(asv2, file = "asv_table.csv")
 
-# cargar primero el archivo de metadatos
+# Load metadata file:
 meta_16s <- read.csv("meta_16s_2024.csv", header = T)
 head(meta_16s)
-# despues cargar la tabla de ASV
+
+# Then, Load the new ASV table with the rows and columns tranposed:
 seqtab.16s <- read.csv("asv_table.csv", header = T, row.names = 1)
 head(seqtab.16s)
-#tail(seqtab.16s)
 str(seqtab.16s)
-# Debido a que al cargar el archivo agrega una X al principio del nombre de
-# cada columna, hay que decirle que los nombres de las columnas son iguales
-# a las filas de sample_id de metadatos para corregir este error
+
+# Because uploading the file adds an “X” to the beginning of each row's name,
+# you need to tell it that the column names are the same as the “sample_id” 
+# rows in the metadata to correct this error: 
 colnames(seqtab.16s) = meta_16s$sample_id
 str(seqtab.16s)
-# Volver a cargar archivo de metadatos
+
+# Load again metadata file:
 meta_16s2 <- read.csv("meta_16s_2024.csv", header = T, row.names = 1)
 head(meta_16s2)
-# cargando taxonomia
+
+# Now, load taxonomy file:
 taxo_16s <-read.csv("taxa_16s_species_2024.csv", header = T,row.names = 1)
 head(taxo_16s)
-# corrobando match entre archivos
+
+# Verifying file matches:
 setdiff(rownames(taxo_16s), rownames(seqtab.16s))
 all(rownames(seqtab.16s) == rownames(taxo_16s))
 all(colnames(seqtab.16s) == rownames(meta_16s2))
 
-# Construct phyloseq object (straightforward from dada2 outputs)
+# Construct phyloseq object (straightforward from dada2 outputs):
 s16_1 <- phyloseq(otu_table(as.matrix(seqtab.16s), taxa_are_rows=T),
                   tax_table(as.matrix(taxo_16s)), 
                   sample_data(meta_16s2))
+
+# Check phyloseq object:
 s16_1
-summarize_phyloseq(s16_1) #13,732,428 reads, 4160 ASVs
+
+# Check summary with microbiome package
+microbiome::summarize_phyloseq(s16_1) #13,732,428 reads, 4160 ASVs
 
 # deleting bad quality samples with low reads
 s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
                       "281022-EMo22-SA035", "281022-EMo22-SD064",
                       "281022-EMo22-SD085", "EMo1223S-SC273",
                       "ENESMo24-bLVEv416s82"))
-s16_1
 
-# Building phylogenetic tree with the function rtree of package "ape"
-#arbol_16s = rtree(ntaxa(s16_1), rooted=TRUE, tip.label=taxa_names(s16_1))
-#plot(arbol_16s)
-# Uniendo el arbol con el objeto phyloseq anterior
-#s16_2 = merge_phyloseq(s16_1, arbol_16s)
-s16_2 = s16_1
-summarize_phyloseq(s16_2) #13,731,996 reads, 4160 ASVs in 356 samples
+# Check summary after removing bad quality samples
+summarize_phyloseq(s16_1) #13,731,996 reads, 4160 ASVs in 356 samples
                           
-
-# Remove contaminants using the frecuency method of the package decontam
+### Remove contaminants using the frecuency method of the package decontam
 #BiocManager::install("decontam")
 library(decontam)
 
-head(sample_data(s16_2))
-
-df <- as.data.frame(sample_data(s16_2)) # Put sample_data into a ggplot-friendly data.frame
-df$LibrarySize <- sample_sums(s16_2)
+head(sample_data(s16_1))
+df <- as.data.frame(sample_data(s16_1)) # Put sample_data into a ggplot-friendly data.frame
+df$LibrarySize <- sample_sums(s16_1)
 df <- df[order(df$LibrarySize),]
 df$Index <- seq(nrow(df))
 ggplot(data=df, aes(x=Index, y=LibrarySize, color=sample_or_control)) + geom_point()
 
 # Identify Contaminants -Frequency
-contamdf.freq <- isContaminant(s16_2, method="frequency", conc="conce_mg")
+contamdf.freq <- isContaminant(s16_1, method="frequency", conc="conce_mg")
 head(contamdf.freq)
 #View(contamdf.freq)
 table(contamdf.freq$contaminant)
 head(which(contamdf.freq$contaminant))
 
 # Identify Contaminants -Prevalence
-sample_data(s16_2)$is.neg <- sample_data(s16_2)$sample_or_control == "Control Sample"
-contamdf.prev <- isContaminant(s16_2, method="prevalence", neg="is.neg")
+sample_data(s16_1)$is.neg <- sample_data(s16_1)$sample_or_control == "Control Sample"
+contamdf.prev <- isContaminant(s16_1, method="prevalence", neg="is.neg")
 table(contamdf.prev$contaminant)
 head(which(contamdf.prev$contaminant), 20)
 #View(contamdf.prev)
 
 # Make phyloseq object of presence-absence in negative controls and true samples
-ps.pa <- transform_sample_counts(s16_2, function(abund) 1*(abund>0))
+ps.pa <- transform_sample_counts(s16_1, function(abund) 1*(abund>0))
 ps.pa.neg <- prune_samples(sample_data(ps.pa)$sample_or_control == "Control Sample", ps.pa)
 ps.pa.pos <- prune_samples(sample_data(ps.pa)$sample_or_control == "True Sample", ps.pa)
 # Make data.frame of prevalence in positive and negative samples
@@ -132,13 +113,13 @@ ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
   xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
 
 ### Remove this contaminant ASVs
-s16_3 <- prune_taxa(!contamdf.prev$contaminant, s16_2)
-summarize_phyloseq(s16_3) #13,343,174 reads, 4112 ASVs in 356 samples
-sum(sample_sums(s16_2)) - sum(sample_sums(s16_3))
+s16_2 <- prune_taxa(!contamdf.prev$contaminant, s16_1)
+summarize_phyloseq(s16_2) #13,343,174 reads, 4112 ASVs in 356 samples
+sum(sample_sums(s16_1)) - sum(sample_sums(s16_2))
 # 388822 read identify as contaminants of 48 ASVs
 
 ################### Extracting only contaminants ##############################
-contaminantes <- prune_taxa(contamdf.prev$contaminant, s16_2) 
+contaminantes <- prune_taxa(contamdf.prev$contaminant, s16_1) 
 contaminantes2 = prune_samples(sample_sums(contaminantes)>=0, contaminantes)
 View(tax_table(contaminantes2))
 # Plotting total abundance to phylum level of contaminants
@@ -151,69 +132,59 @@ plot_bar(contaminantes2, fill = "Phylum")+
 # at least once.
 
 # Compute prevalence of each feature, store as data.frame
-prevdf = apply(X = otu_table(s16_3),
-               MARGIN = ifelse(taxa_are_rows(s16_3), yes = 1, no = 2),
+prevdf = apply(X = otu_table(s16_2),
+               MARGIN = ifelse(taxa_are_rows(s16_2), yes = 1, no = 2),
                FUN = function(x){sum(x > 0)})
 # Add taxonomy and total read counts to this data.frame
 prevdf = data.frame(Prevalence = prevdf,
-                    TotalAbundance = taxa_sums(s16_3),
-                    tax_table(s16_3))
+                    TotalAbundance = taxa_sums(s16_2),
+                    tax_table(s16_2))
 #View(prevdf)
 #write.csv(prevdf, file = "prevalencia.csv")
 
 plyr::ddply(prevdf, "Phylum", function(df1)
 {cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
 
-# Filtering phyla whose prevalence is 0
-filterPhyla = c("Campylobacterota", "Crenarchaeota", "Euryarchaeota",
-                "Fibrobacterota", "Patescibacteria", "Synergistota")
-
 # Filtering phyla whose prevalence is 1
 filterPhyla = c("Euryarchaeota", "FCPU426", "RCP2-54",
                 "Synergistota", "Thermotogota", "WPS-2")
 # Filter entries with low prevalence Phylum.
-s16_4 = subset_taxa(s16_3, !Phylum %in% filterPhyla)
-s16_4 # Final ASV data set: 4106 ASVs in 227 samples
+s16_3 = subset_taxa(s16_2, !Phylum %in% filterPhyla)
+s16_3 # Final ASV data set: 4106 ASVs in 356 samples
 
 # Filtering samples of Morelia site
-s16_5 = subset_samples(s16_4, sitio=="morelia")
-summarize_phyloseq(s16_5)  #9,453,658 reads, 4106 ASVs
+s16_4 = subset_samples(s16_3, sitio=="morelia")
+summarize_phyloseq(s16_4)  #9,453,658 reads, 4106 ASVs in 231 samples
+
 # Removing Chloroplast and Mitochondria sequences and na samples in condition
-s16_5 = subset_samples(s16_5, condicion !="BLANCO")
+s16_5 = subset_samples(s16_4, condicion !="BLANCO")
 s16_5 = subset_taxa(s16_5, Order != "Chloroplast")
 s16_5 = subset_taxa(s16_5, Family != "Mitochondria")
-# Hay algunas muestras que quedaron sin secuencias, ya que todas sus secuencias
-# pertenecian al Reino Viridiplantae. Por lo que voy a excluir esas 
-# muestras que quedaron con 0 secuencias:
+
+# There are some samples that ended up with no sequences, since all of their
+# sequences belonged to the Viridiplantae kingdom. Therefore, I am going to 
+# exclude those samples that ended up with 0 sequences:
 s16_5 = prune_samples(sample_sums(s16_5)>1, s16_5)
 s16_5
-summarize_phyloseq(s16_5) #146,201 reads, 3089 ASVs
 
 #Remove taxa with 0 observation
 s16_6 <- prune_taxa(taxa_sums(s16_5) > 0, s16_5)
 s16_6
-summarize_phyloseq(s16_6) #146,201 reads, 1635 ASVs in 227 samples
+View(otu_table(s16_6))
 
-#View(otu_table(s16_6))
+# Check summary of phyloseq object
+summarize_phyloseq(s16_6) #146,201 reads, 1635 ASVs in 227 samples
 #write.csv(otu_table(s16_6), file = "s16_6.csv")
 
-# Primero resumimos el contenido del objeto phyloseq
-summarize_phyloseq(s16_6) # reads totales 146,201
-sort(sample_sums(s16_6))
-
-# información del número de reads
+# Summary of number of read
 summary(sample_sums(s16_6))
-range(sample_sums(s16_6))
-#Library size spans 2 - 24079 reads 
+range(sample_sums(s16_6)) #Library size spans 2 - 24079 reads 
 
-# Obteniendo el número de read por muestra
+# Calculating the number of reads per sample
 reads_sample = readcount(s16_6)
 reads_sample[1:5]
 #write.csv(reads_sample, file = "reads_sample_16s_todas.csv")
 
-#s16_7 = subset_samples(s16_6, sampleid2 != "281022-EMo22-SA084")
-#View(otu_table(s16_7))
-#write.csv(otu_table(s16_7), file = "outlier.csv")
 
 # Plotting total abundance to phylum level
 plot_bar(s16_6, fill = "Phylum")+ 
@@ -224,7 +195,7 @@ s16_6_re = transform_sample_counts(s16_6, function(x) x / sum(x))
 plot_bar(s16_6_re, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
 
-# checking correlation between reads and ASVs observados
+# checking correlation between reads and observed ASVs
 ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
                          "observed" = phyloseq::estimate_richness(s16_6,
                                       measures = "Observed")[, 1]),
@@ -234,11 +205,11 @@ ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
   labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 
-#### CONTAR TAXONES POR NIVEL TAXONÓMICO #####
-# Extraer la tabla de taxonomía
+#### COUNT TAXONS BY TAXONOMIC LEVEL #####
+# Extract the taxonomy table
 taxo <- as.data.frame(tax_table(s16_6))
 
-# Contar taxones únicos por nivel
+# Count taxons by taxonomic level
 n_species <- length(unique(na.omit(taxo$Species)))
 n_genera  <- length(unique(na.omit(taxo$Genus)))
 n_families <- length(unique(na.omit(taxo$Family)))
@@ -246,7 +217,7 @@ n_orders  <- length(unique(na.omit(taxo$Order)))
 n_classes <- length(unique(na.omit(taxo$Class)))
 n_phyla   <- length(unique(na.omit(taxo$Phylum)))
 
-# Ver todos juntos
+# Make a table
 data.frame(
   Nivel   = c("Phylum", "Class", "Order", "Family", "Genus", "Species"),
   N_taxones = c(n_phyla, n_classes, n_orders, n_families, n_genera, n_species)
@@ -256,6 +227,136 @@ data.frame(
 ###############################################################################
 ### Analysis of alpha diversity calculating Hill numbers
 
+# Extract data from phyloseq object:
+otu_data <- otu_table(s16_6, taxa_are_rows = TRUE)
+metadata <- as(sample_data(s16_6), "data.frame")
+head(metadata)
+
+# Calculating hill numbers
+library(hilldiv3)
+
+q0 <- hilldiv(otu_data, q = 0)
+q1 <- hilldiv(otu_data, q = 1)
+q2 <- hilldiv(otu_data, q = 2)
+
+# Merge metadata with Hill numbers
+library(tidyr)
+
+q012_ancho <- bind_rows(q0, q1, q2) %>%
+  pivot_wider(names_from = q,
+              values_from = value,
+              names_prefix = "q")
+
+head(q012_ancho)
+
+# join
+metadata_with_hill <- q012_ancho %>%
+  inner_join(metadata, by = c("sample"="sampleid2"))
+
+# show
+head(metadata_with_hill)
+
+
+### 02. GET HILL MEANS
+# Reorder q values
+meta_qs <- metadata_with_hill %>%
+  pivot_longer(cols = q0:q2, names_to = "q", values_to = "value") %>%
+  filter(q %in% c("q0", "q1", "q2")) %>%
+  mutate(
+    qs = case_when(
+      q == "q0" ~ "q0=Observed",
+      q == "q1" ~ "q1=Exp Shannon",
+      q == "q2" ~ "q2=Inv Simpson",
+    ))
+
+#Get means of Hill numbers
+means <- meta_qs %>% group_by(condicion, sexo, tratamiento, qs) %>%
+  summarise(means = mean(value, na.rm = TRUE),
+            sd = sd(value, na.rm = TRUE),
+            .groups = 'drop')
+
+print(means)
+
+
+### 03. Get sequencing effort
+### Sample effort
+library(vegan)
+mat <- as(t(otu_table(s16_6)), "matrix")
+raremax <- min(rowSums(mat))
+
+# plot
+system.time(rarecurve(mat, step = 100, sample = raremax, col = "green4", 
+                      label = FALSE))
+
+
+### 04. Check alpha diversity correlation with sequencing depth
+#Get effective reads
+Effective_reads <- colSums(otu_data[-1, ])
+metadata_with_hill$Effective_reads <- Effective_reads
+View(metadata_with_hill)
+
+# Alpha diversity depth correlation to order q=0
+library(ggpubr)
+
+q0_vs_depth <- ggscatter(metadata_with_hill,
+               x = "Effective_reads", y = "q0", 
+               xlab= "Sequencing depth (number of reads)",
+               ylab = "q=0", add = "reg.line",
+               add.params = list(color = "#114e9d", fill = "lightgray"),
+               conf.int = TRUE, # Add confidence interval
+               cor.coef = TRUE, # Add correlation coefficient. 
+               cor.coeff.args = list(method = "pearson", label.x = 3, label.sep = "\n")
+)+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+# Alpha diversity depth correlation to order q=1
+q1_vs_depth <- ggscatter(metadata_with_hill, 
+               x = "Effective_reads", y = "q1", 
+               xlab= "Sequencing depth (number of reads)",
+               ylab = "q=1", add = "reg.line",
+               add.params = list(color = "#114e9d", fill = "lightgray"),
+               conf.int = TRUE, # Add confidence interval
+               cor.coef = TRUE, # Add correlation coefficient
+               cor.coeff.args = list(method = "pearson", label.x = 3, label.sep = "\n")) +
+  theme(legend.title = element_blank(), 
+        legend.position = "none")
+
+# Alpha diversity depth correlation to order q=2
+q2_vs_depth <- ggscatter(metadata_with_hill, 
+               x = "Effective_reads", y = "q2", 
+               xlab= "Sequencing depth (number of reads)",
+               ylab = "q=2", add = "reg.line",
+               add.params = list(color = "#114e9d", fill = "lightgray"),
+               conf.int = TRUE, # Add confidence interval
+               cor.coef = TRUE, # Add correlation coefficient
+               cor.coeff.args = list(method = "pearson", label.x = 3, label.sep = "\n")) +
+  theme(legend.title = element_blank(), 
+        legend.position = "none")
+
+#Combine plot
+library(cowplot)
+title_corr_plot <- ggdraw() + 
+  draw_label("Alpha diversity depth correlation")
+
+correlation_plot_q012 <- plot_grid(title_corr_plot,
+                                   q0_vs_depth, 
+                                   q1_vs_depth, 
+                                   q2_vs_depth,
+                                   ncol = 1, 
+                                   rel_heights = c(0.15, 1, 1, 1))
+
+correlation_plot_q012
+
+
+### 05. Get significant differences
+# Change variable to factor
+metadata_with_hill$condicion = factor(metadata_with_hill$condicion)
+
+# linear model adjust
+q0lm <- lm(q0 ~ log(Effective_reads) + condicion,
+           data = metadata_with_hill)
+# summary
+summary(q0lm)
 
 
 
@@ -263,14 +364,13 @@ data.frame(
 
 
 
+summary(metadata_with_hill$Effective_reads)
+sum(is.na(metadata_with_hill$Effective_reads))
+sum(metadata_with_hill$Effective_reads <= 0, na.rm = TRUE)
 
-
-
-
-
-
-
-
+metadata_with_hill %>%
+  filter(is.na(Effective_reads) | Effective_reads <= 0) %>%
+  select(sample, Effective_reads)
 
 
 

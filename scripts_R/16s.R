@@ -1,4 +1,5 @@
-############## Taxonomic and diversity analysis with R of 16s ##################
+############## Taxonomic and diversity analysis with R of 16s amplicon
+############## sequencing from nectar samples.
 ##### Luis Alberto Villanueva Espino
 #### November 2026
 
@@ -77,7 +78,7 @@ s16_1 = subset_samples(s16_1, !sampleid2 %in% c("281022-EMo22-SA014",
 # Check summary after removing bad quality samples
 summarize_phyloseq(s16_1) #13,731,996 reads, 4160 ASVs in 356 samples
                           
-### Remove contaminants using the frecuency method of the package decontam
+### Remove contaminants using the prevalence method of the package decontam
 #BiocManager::install("decontam")
 library(decontam)
 
@@ -140,7 +141,6 @@ prevdf = data.frame(Prevalence = prevdf,
                     TotalAbundance = taxa_sums(s16_2),
                     tax_table(s16_2))
 #View(prevdf)
-#write.csv(prevdf, file = "prevalencia.csv")
 
 plyr::ddply(prevdf, "Phylum", function(df1)
 {cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
@@ -174,7 +174,6 @@ View(otu_table(s16_6))
 
 # Check summary of phyloseq object
 summarize_phyloseq(s16_6) #146,201 reads, 1635 ASVs in 227 samples
-#write.csv(otu_table(s16_6), file = "s16_6.csv")
 
 # Summary of number of read
 summary(sample_sums(s16_6))
@@ -194,15 +193,6 @@ plot_bar(s16_6, fill = "Phylum")+
 s16_6_re = transform_sample_counts(s16_6, function(x) x / sum(x))
 plot_bar(s16_6_re, fill = "Phylum")+ 
   geom_bar(aes(color = Phylum), stat = "identity", position = "stack")
-
-# checking correlation between reads and observed ASVs
-ggplot(data = data.frame("total_reads" =  phyloseq::sample_sums(s16_6),
-                         "observed" = phyloseq::estimate_richness(s16_6,
-                                      measures = "Observed")[, 1]),
-       aes(x = total_reads, y = observed)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE) +
-  labs(x = "\nTotal Reads", y = "Observed Richness\n")
 
 
 #### COUNT TAXONS BY TAXONOMIC LEVEL #####
@@ -232,7 +222,8 @@ otu_data <- otu_table(s16_6, taxa_are_rows = TRUE)
 metadata <- as(sample_data(s16_6), "data.frame")
 head(metadata)
 
-# Calculating hill numbers
+
+# 01. Calculating hill numbers
 library(hilldiv3)
 
 q0 <- hilldiv(otu_data, q = 0)
@@ -256,8 +247,11 @@ metadata_with_hill <- q012_ancho %>%
 # show
 head(metadata_with_hill)
 
+# Save table
+#write.csv(metadata_with_hill, file = "metadata_with_hill.csv")
 
-### 02. GET HILL MEANS
+
+### 02. Get Hill means
 # Reorder q values
 meta_qs <- metadata_with_hill %>%
   pivot_longer(cols = q0:q2, names_to = "q", values_to = "value") %>%
@@ -276,7 +270,7 @@ means <- meta_qs %>% group_by(condicion, sexo, tratamiento, qs) %>%
             .groups = 'drop')
 
 print(means)
-
+write.csv(means, file = "Hill_means.csv")
 
 ### 03. Get sequencing effort
 ### Sample effort
@@ -344,7 +338,7 @@ correlation_plot_q012 <- plot_grid(title_corr_plot,
                                    q2_vs_depth,
                                    ncol = 1, 
                                    rel_heights = c(0.15, 1, 1, 1))
-
+# Print plot
 correlation_plot_q012
 
 

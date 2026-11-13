@@ -1,0 +1,25 @@
+"","condicion","sexo","tratamiento","qs","means","sd"
+"1","domesticada","hembra","t1","q0=Observed",14.4,15.3753048750261
+"2","domesticada","hembra","t1","q1=Exp Shannon",6.35551485441347,5.91614763472778
+"3","domesticada","hembra","t1","q2=Inv Simpson",4.14847233809537,2.75839062719437
+"4","domesticada","hembra","t2","q0=Observed",17,12.0415945787923
+"5","domesticada","hembra","t2","q1=Exp Shannon",6.77811569763021,4.21383632251755
+"6","domesticada","hembra","t2","q2=Inv Simpson",4.28697699842248,2.33298030817526
+"7","domesticada","macho","t1","q0=Observed",10.2333333333333,13.4962225307258
+"8","domesticada","macho","t1","q1=Exp Shannon",4.78691174541426,4.68314003474507
+"9","domesticada","macho","t1","q2=Inv Simpson",3.41444199996385,2.71487194701325
+"10","domesticada","macho","t2","q0=Observed",14.3428571428571,12.7670136937133
+"11","domesticada","macho","t2","q1=Exp Shannon",5.62697965527336,3.08048043184562
+"12","domesticada","macho","t2","q2=Inv Simpson",3.875419049477,1.83189550562551
+"13","silvestre","hembra","t1","q0=Observed",9.35294117647059,10.7815883365497
+"14","silvestre","hembra","t1","q1=Exp Shannon",4.46590959584879,2.62379830522
+"15","silvestre","hembra","t1","q2=Inv Simpson",3.2942650078187,1.82423843161409
+"16","silvestre","hembra","t2","q0=Observed",17.8571428571429,10.7907164006641
+"17","silvestre","hembra","t2","q1=Exp Shannon",6.04054219444715,2.14249878674594
+"18","silvestre","hembra","t2","q2=Inv Simpson",3.96209960562964,1.35269428905893
+"19","silvestre","macho","t1","q0=Observed",12.1111111111111,8.27569812687603
+"20","silvestre","macho","t1","q1=Exp Shannon",5.66114523048528,3.69192465328234
+"21","silvestre","macho","t1","q2=Inv Simpson",3.92287703794226,2.63612046075617
+"22","silvestre","macho","t2","q0=Observed",19.2,13.7175591331486
+"23","silvestre","macho","t2","q1=Exp Shannon",6.87924873236877,3.3435112300855
+"24","silvestre","macho","t2","q2=Inv Simpson",4.25236135054072,1.68698612550157

@@ -291,7 +291,7 @@ system.time(rarecurve(mat, step = 100, sample = raremax, col = "green4",
 
 ### 04. Check alpha diversity correlation with sequencing depth
 #Get effective reads
-Effective_reads <- colSums(otu_data[-1, ])
+Effective_reads <- colSums(otu_data)
 metadata_with_hill$Effective_reads <- Effective_reads
 View(metadata_with_hill)
 
@@ -353,14 +353,16 @@ correlation_plot_q012
 metadata_with_hill$condicion = factor(metadata_with_hill$condicion)
 
 # linear model adjust
-q0lm <- lm(q0 ~ log(Effective_reads) + condicion,
+q0lm <- lm(q0 ~ log(Effective_reads) + condicion + sexo + tratamiento,
            data = metadata_with_hill)
 # summary
 summary(q0lm)
 
+# check model reliability
+shapiro.test(residuals(q0lm))
 
-
-
+#effects
+anova(q0lm)
 
 
 

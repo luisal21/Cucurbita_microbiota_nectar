@@ -270,7 +270,7 @@ means <- meta_qs %>% group_by(condicion, sexo, tratamiento, qs) %>%
             .groups = 'drop')
 
 print(means)
-write.csv(means, file = "Hill_means.csv")
+#write.csv(means, file = "Hill_means.csv")
 
 ### 03. Get sequencing effort
 ### Sample effort
@@ -352,67 +352,59 @@ hist(metadata_with_hill$q2)
 # Change variable to factor
 metadata_with_hill$condicion = factor(metadata_with_hill$condicion)
 
-# linear model adjust
+# Generalized linear model of q0 with negative binomial distribution
 library(MASS)
-q0glm <- glm.nb(q0 ~ log(Effective_reads) + condicion,
+q0glm <- glm.nb(q0 ~ log(Effective_reads) + condicion * sexo * tratamiento,
                 data = metadata_with_hill)
 
-
-
-
-q0lm <- lm(q0 ~ log(Effective_reads) + condicion + sexo + tratamiento,
-           data = metadata_with_hill)
 # summary
 summary(q0glm)
 
+#effects
+anova(q0glm)
+
 # check model reliability
-shapiro.test(residuals(q0glm))
+library(DHARMa)
+
+sim <- simulateResiduals(q0glm)
+plot(sim)              # QQ-plot of uniformity and residuals versus predicted 
+# values
+testDispersion(sim)    # Is there overdispersion or underdispersion?
+testZeroInflation(sim) # Are there more zeros than expected?
+testOutliers(sim)      # Are there any atypical ones?
+
+#get differences with emmeans
+library(emmeans)
+emm <- emmeans(q0glm, ~ condicion | sexo, type = "response")
+emm                               # estimated means by group
+
+pairs(emm)                        # condition within each sex
+
+# plot
+emmip(q0glm, condicion ~ sexo, type = "response", CIs = TRUE)
+
+
+### q1 Diversity Exp Shannon
+mod_q1 <- glm(q1 ~ log(Effective_reads) + condicion * sexo * tratamiento, 
+              data = metadata_with_hill,
+              family = Gamma(link = "log"))
+
+# summary
+summary(mod_q1)
 
 #effects
-anova(q0lm)
+anova(mod_q1)
 
-# Paso 2: Análisis estadístico con tus variables
-# Para cada orden de Hill
-# Modelo con q0
-modnb_q0 <- glm(qD_q0 ~ condicion * sexo * tratamiento, 
-                 data = hill_wide_ic,
-                 family = Gamma(link = "log"))
-summary(modnb_q0)
+### q2 Dominance Inv Simpson
+mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
+              data = metadata_with_hill,
+              family = Gamma(link = "log"))
 
-# Modelo con q1
-mod_q1 <- glm(qD_q1 ~ condicion * sexo * tratamiento, 
-              data = hill_wide_ic,
-              family = Gamma(link = "log"))
-summary(mod_q1)
-# Modelo con q2
-mod_q2 <- glm(qD_q2 ~ condicion * sexo * tratamiento, 
-              data = hill_wide_ic,
-              family = Gamma(link = "log"))
+# summary
 summary(mod_q2)
 
-# ANOVA tipo II
-library(car)
-Anova(modnb_q0)
-Anova(mod_q1)
-Anova(mod_q2)
-
-# Summary
-#q0
-tapply(hill_wide_ic$qD_q0, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
-                                hill_wide_ic$tratamiento), mean)
-tapply(hill_wide_ic$qD_q0, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
-                        hill_wide_ic$tratamiento), sd)
-#q1
-tapply(hill_wide_ic$qD_q1, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
-                        hill_wide_ic$tratamiento), mean)
-tapply(hill_wide_ic$qD_q1, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
-                        hill_wide_ic$tratamiento), sd)
-#q2
-tapply(hill_wide_ic$qD_q2, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
-                        hill_wide_ic$tratamiento), mean)
-tapply(hill_wide_ic$qD_q2, list(hill_wide_ic$condicion,hill_wide_ic$sexo,
-                        hill_wide_ic$tratamiento), sd)
-
+#effects
+anova(mod_q2)
 
 
 

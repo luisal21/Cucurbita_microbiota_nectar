@@ -349,9 +349,6 @@ hist(metadata_with_hill$q1)
 hist(metadata_with_hill$q2)
 
 
-# Change variable to factor
-metadata_with_hill$condicion = factor(metadata_with_hill$condicion)
-
 # Generalized linear model of q0 with negative binomial distribution
 library(MASS)
 q0glm <- glm.nb(q0 ~ log(Effective_reads) + condicion * sexo * tratamiento,
@@ -361,7 +358,8 @@ q0glm <- glm.nb(q0 ~ log(Effective_reads) + condicion * sexo * tratamiento,
 summary(q0glm)
 
 #effects
-anova(q0glm)
+library(car)
+Anova(q0glm)
 
 # check model reliability
 library(DHARMa)
@@ -393,7 +391,7 @@ mod_q1 <- glm(q1 ~ log(Effective_reads) + condicion * sexo * tratamiento,
 summary(mod_q1)
 
 #effects
-anova(mod_q1)
+Anova(mod_q1)
 
 ### q2 Dominance Inv Simpson
 mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
@@ -404,9 +402,7 @@ mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento,
 summary(mod_q2)
 
 #effects
-anova(mod_q2)
-
-
+Anova(mod_q2)
 
 ###############################################################################
 ###############################################################################

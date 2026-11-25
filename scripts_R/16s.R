@@ -225,6 +225,7 @@ head(metadata)
 
 # 01. Calculating hill numbers
 library(hilldiv3)
+citation("hilldiv3")
 
 q0 <- hilldiv(otu_data, q = 0)
 q1 <- hilldiv(otu_data, q = 1)
@@ -393,6 +394,12 @@ summary(mod_q1)
 #effects
 Anova(mod_q1)
 
+sim1 <- simulateResiduals(mod_q1)
+plot(sim1)              # QQ-plot of uniformity and residuals versus predicted 
+# values
+testDispersion(sim1)    # Is there overdispersion or underdispersion?
+testOutliers(sim1)      # Are there any atypical ones?
+
 ### q2 Dominance Inv Simpson
 mod_q2 <- glm(q2 ~ condicion * sexo * tratamiento, 
               data = metadata_with_hill,
@@ -404,50 +411,53 @@ summary(mod_q2)
 #effects
 Anova(mod_q2)
 
+sim2 <- simulateResiduals(mod_q2)
+plot(sim2)              # QQ-plot of uniformity and residuals versus predicted 
+# values
+testDispersion(sim2)    # Is there overdispersion or underdispersion?
+testOutliers(sim2)      # Are there any atypical ones?
+
 ###############################################################################
 ###############################################################################
 ################ BETA DIVERSITY OF BACTERIA
 #BiocManager::install("DECIPHER")
   
-# Cargando paquetes
-library(DECIPHER)
-library(phangorn)
-library(Biostrings)
+# Loading libraries to build phylogenetic tree
+#library(DECIPHER)
+#library(phangorn)
+#library(Biostrings)
 
+#ntaxa(s16_6)
 
-ntaxa(s16_6)
+# 1. extract directly from the rownames
+#seqs <- rownames(otu_table(s16_6))
 
-# 1. extraer directo de los rownames
-seqs <- rownames(otu_table(s16_6))
+# 2. Verify that they are sequences and not IDs
+#head(seqs)  # deben verse como "ATCGGCTA..." 
+#nchar(seqs[1])  # debe tener longitud de ~250 pb para ITS2
 
-# 2. Verificar que son secuencias y no IDs
-head(seqs)  # deben verse como "ATCGGCTA..." 
-nchar(seqs[1])  # debe tener longitud de ~250 pb para ITS2
+# 3. Convert to DNAStringSet and name
+#seqs_dna <- DNAStringSet(seqs)
+#names(seqs_dna) <- seqs
 
-# 3. Convertir a DNAStringSet y nombrar
-seqs_dna <- DNAStringSet(seqs)
-names(seqs_dna) <- seqs
+# 4. Verify
+#class(seqs_dna)
+#length(seqs_dna)  # debe coincidir con número de ASVs
 
-# 4. Verificar
-class(seqs_dna)
-length(seqs_dna)  # debe coincidir con número de ASVs
+# 5. Now run the alignment
+#alineamiento <- AlignSeqs(seqs_dna)
 
-# 5. Ahora sí correr el alineamiento
-alineamiento <- AlignSeqs(seqs_dna)
+# 6. Save the alignment in FASTA format
+#writeXStringSet(alineamiento, 
+#                filepath = "alineamiento_its2.fasta")
 
-# 6. Guardar el alineamiento en formato FASTA
-writeXStringSet(alineamiento, 
-                filepath = "alineamiento_its2.fasta")
+# 7. Verify that it was saved
+#file.exists("alineamiento_its2.fasta")
 
-# 7. Verificar que se guardó
-file.exists("alineamiento_its2.fasta")
-
-
-
-####################### Importar árbol ##########################
+####################### Importing tree ##########################
 library(ape)
 library(phangorn)
-setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data")
+setwd("/home/luis/Documentos/papers_publicados/paper2_tesisDoctorado/Cucurbita_microbiota_nectar/data_16s")
 
 # Cargando arbol
 arbol_ft <- read.tree("arbol_its2.nwk")
@@ -466,10 +476,13 @@ ps_con_arbol <- merge_phyloseq(s16_6, phy_tree(arbol_ft_root))
 ps_con_arbol
 phy_tree(ps_con_arbol)
 
+
 ######### UniFrac no ponderado #########
+set.seed(123)
 unifrac_nw <- UniFrac(ps_con_arbol, weighted = FALSE, normalized = TRUE)
 
 # UniFrac ponderado
+set.seed(123)
 unifrac_w  <- UniFrac(ps_con_arbol, weighted = TRUE, normalized = TRUE)
 
 # PERMANOVA y gráficas para UniFrac
@@ -478,13 +491,13 @@ library(vegan)
 metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
 
 # UniFrac no ponderado
-set.seed(1)
+set.seed(123)
 adonis2(unifrac_nw ~ condicion * sexo * tratamiento,
         data         = metadata,
         permutations = 999, by = "terms")
 
 # UniFrac ponderado
-set.seed(1)
+set.seed(123)
 adonis2(unifrac_w ~ condicion * sexo * tratamiento,
         data         = metadata,
         permutations = 999, by = "terms")
@@ -630,13 +643,13 @@ dist_sorensen <- vegdist(asv_matrix, method = "bray", binary = TRUE)
 metadata <- as.data.frame(as.matrix(sample_data(ps_con_arbol)))
 
 # Con Bray-Curtis
-set.seed(1)
+set.seed(123)
 adonis2(dist_bray ~ condicion * sexo * tratamiento,
         data         = metadata,
         permutations = 999, by = "terms")
 
 # Con Sørensen
-set.seed(1)
+set.seed(123)
 adonis2(dist_sorensen ~ condicion * sexo * tratamiento,
         data         = metadata,
         permutations = 999, by = "terms")
